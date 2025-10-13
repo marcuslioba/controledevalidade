@@ -4,13 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>Checklist Auditoria</title>
-  <meta name="description" content="Checklist com dados da loja, geolocalização, geofence e relatório em PDF." />
+  <meta name="description" content="Checklist com dados da loja, categorias, CSV avançado, geolocalização com validação de endereço, e relatório." />
 
-  <!-- Tailwind CSS (CDN) -->
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <!-- Font Awesome (ícones) -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-  <!-- React 17 + Babel -->
   <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -20,10 +17,8 @@
       .print\:hidden { display: none !important; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
-    body {
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
+    body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 700; }
   </style>
 </head>
 <body class="bg-gray-50">
@@ -31,99 +26,88 @@
 
   <script type="text/babel">
     function App() {
-      // ----------------- Estado principal -----------------
+      // Modelo: cada pergunta = { id, categoria, texto, fotoObrigatoria: boolean }
       const [perguntas, setPerguntas] = React.useState([
-        'Você verificou os equipamentos?',
-        'Você seguiu os procedimentos de segurança?',
-        'Você completou a documentação necessária?'
+        { id: 1, categoria: 'Segurança', texto: 'EPIs conferidos?', fotoObrigatoria: true },
+        { id: 2, categoria: 'Operação', texto: 'Equipamentos verificados?', fotoObrigatoria: false },
+        { id: 3, categoria: 'Documentação', texto: 'Documentos atualizados?', fotoObrigatoria: false },
       ]);
       const [novaPergunta, setNovaPergunta] = React.useState('');
+      const [novaCategoria, setNovaCategoria] = React.useState('');
+      const [novaFotoObrigatoria, setNovaFotoObrigatoria] = React.useState(false);
       const [editandoIndex, setEditandoIndex] = React.useState(null);
       const [textoEdicao, setTextoEdicao] = React.useState('');
+      const [categoriaEdicao, setCategoriaEdicao] = React.useState('');
+      const [fotoObrigatoriaEdicao, setFotoObrigatoriaEdicao] = React.useState(false);
+
       const [checklistIniciado, setChecklistIniciado] = React.useState(false);
       const [checklistFinalizado, setChecklistFinalizado] = React.useState(false);
 
-      // Dados da Loja (persistência)
+      // Loja
       const [lojaNome, setLojaNome] = React.useState('');
       const [lojaEndereco, setLojaEndereco] = React.useState('');
 
-      // Geolocalização e Geofence
-      const [geoStatus, setGeoStatus] = React.useState('idle'); // idle | buscando | ok | erro
-      const [coords, setCoords] = React.useState(null); // { latitude, longitude, accuracy }
-      const [endereco, setEndereco] = React.useState('');
+      // Geo
+      const [geoStatus, setGeoStatus] = React.useState('idle');
+      const [coords, setCoords] = React.useState(null);
+      const [enderecoGPS, setEnderecoGPS] = React.useState('');
       const [geoErro, setGeoErro] = React.useState('');
+      const [gpsConfereEndereco, setGpsConfereEndereco] = React.useState(null); // true/false/null
+      const [gpsValidando, setGpsValidando] = React.useState(false);
 
       const [alvoLat, setAlvoLat] = React.useState('');
       const [alvoLon, setAlvoLon] = React.useState('');
-      const [alvoRaio, setAlvoRaio] = React.useState(100); // metros
+      const [alvoRaio, setAlvoRaio] = React.useState(100);
       const [distancia, setDistancia] = React.useState(null);
       const [dentroDaArea, setDentroDaArea] = React.useState(false);
 
-      // Respostas e evidências
-      const [respostas, setRespostas] = React.useState({}); // { index: 'sim'|'nao' }
-      const [evidencias, setEvidencias] = React.useState({}); // { index: dataURL }
+      // Respostas e evidências: respostas[idxPerguntaId] = 'sim' | 'nao'
+      const [respostas, setRespostas] = React.useState({});
+      // evidencias[idxPerguntaId] = DataURL
+      const [evidencias, setEvidencias] = React.useState({});
 
       // Tempo
       const [inicioISO, setInicioISO] = React.useState(null);
       const [fimISO, setFimISO] = React.useState(null);
 
-      // Upload CSV
+      // CSV
       const [uploadErro, setUploadErro] = React.useState('');
 
-      // ---- Sets de perguntas (persistência local) ----
+      // Conjuntos salvos
       const [nomeSet, setNomeSet] = React.useState('');
-      const [setsSalvos, setSetsSalvos] = React.useState([]); // [{name, count, updatedAt}]
+      const [setsSalvos, setSetsSalvos] = React.useState([]);
       const [setSelecionado, setSetSelecionado] = React.useState('');
 
-      // ----------------- Utilidades -----------------
+      // Utils
       const formatarDataHora = (iso) => {
         if (!iso) return '';
         const d = new Date(iso);
         return d.toLocaleString('pt-BR');
       };
-
       const duracaoHumana = (ms) => {
         if (!ms || ms < 0) return '';
         const s = Math.floor(ms / 1000);
         const h = Math.floor(s / 3600);
         const m = Math.floor((s % 3600) / 60);
         const seg = s % 60;
-        const partes = [];
-        if (h) partes.push(h + 'h');
-        if (m || h) partes.push(m + 'm');
-        partes.push(seg + 's');
-        return partes.join(' ');
+        return [h ? h + 'h' : null, (m || h) ? m + 'm' : null, seg + 's'].filter(Boolean).join(' ');
       };
-
       const toRad = (deg) => (deg * Math.PI) / 180;
       const haversineMeters = (lat1, lon1, lat2, lon2) => {
         const R = 6371000;
         const dLat = toRad(lat2 - lat1);
         const dLon = toRad(lon2 - lon1);
-        const a =
-          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-          Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         return R * c;
       };
 
-      // ----------------- localStorage para sets -----------------
+      // localStorage sets perguntas
       const LS_META_KEY = 'checklist_sets_meta';
-
       const carregarMeta = () => {
-        try {
-          const raw = localStorage.getItem(LS_META_KEY);
-          return raw ? JSON.parse(raw) : [];
-        } catch {
-          return [];
-        }
+        try { return JSON.parse(localStorage.getItem(LS_META_KEY) || '[]'); } catch { return []; }
       };
-
-      const salvarMeta = (meta) => {
-        localStorage.setItem(LS_META_KEY, JSON.stringify(meta));
-      };
-
+      const salvarMeta = (meta) => localStorage.setItem(LS_META_KEY, JSON.stringify(meta));
       const salvarSetLocal = (nome, listaPerguntas) => {
         if (!nome || !listaPerguntas || listaPerguntas.length === 0) return;
         localStorage.setItem(`checklist_set::${nome}`, JSON.stringify(listaPerguntas));
@@ -134,16 +118,9 @@
         salvarMeta(meta);
         setSetsSalvos(meta);
       };
-
       const carregarSetLocal = (nome) => {
-        try {
-          const raw = localStorage.getItem(`checklist_set::${nome}`);
-          return raw ? JSON.parse(raw) : null;
-        } catch {
-          return null;
-        }
+        try { return JSON.parse(localStorage.getItem(`checklist_set::${nome}`) || 'null'); } catch { return null; }
       };
-
       const excluirSetLocal = (nome) => {
         localStorage.removeItem(`checklist_set::${nome}`);
         const meta = carregarMeta().filter(m => m.name !== nome);
@@ -151,31 +128,58 @@
         setSetsSalvos(meta);
       };
 
-      // ----------------- localStorage para dados da loja -----------------
-      const salvarLojaNome = (nome) => {
-        localStorage.setItem('loja_nome', nome);
-        setLojaNome(nome);
-      };
-
-      const salvarLojaEndereco = (endereco) => {
-        localStorage.setItem('loja_endereco', endereco);
-        setLojaEndereco(endereco);
-      };
-
+      // localStorage dados da loja
+      const salvarLojaNome = (nome) => { localStorage.setItem('loja_nome', nome); setLojaNome(nome); };
+      const salvarLojaEndereco = (endereco) => { localStorage.setItem('loja_endereco', endereco); setLojaEndereco(endereco); };
       const carregarDadosLoja = () => {
-        const nome = localStorage.getItem('loja_nome') || '';
-        const endereco = localStorage.getItem('loja_endereco') || '';
-        setLojaNome(nome);
-        setLojaEndereco(endereco);
+        setLojaNome(localStorage.getItem('loja_nome') || '');
+        setLojaEndereco(localStorage.getItem('loja_endereco') || '');
       };
 
-      // Carregar lista de sets e dados da loja ao iniciar
       React.useEffect(() => {
         setSetsSalvos(carregarMeta());
         carregarDadosLoja();
       }, []);
 
-      // ----------------- Geolocalização -----------------
+      // GEO
+      const normalizarTexto = (s) => {
+        return (s || '')
+          .toString()
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[.,;:]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+
+      const extrairTokensEndereco = (s) => {
+        const t = normalizarTexto(s);
+        // Remove números isolados muito curtos para evitar falsos positivos
+        return t.split(' ').filter(w => w && !/^\d{1,2}$/.test(w));
+      };
+
+      const enderecoCoincide = (endLoja, endGPS) => {
+        // Estratégia simples e robusta:
+        // - precisa pelo menos 2-3 tokens relevantes em comum
+        const a = new Set(extrairTokensEndereco(endLoja));
+        const b = new Set(extrairTokensEndereco(endGPS));
+        let inter = 0;
+        for (const token of a) {
+          if (b.has(token)) inter++;
+        }
+        return inter >= 3; // ajuste fino: 3 tokens comuns
+      };
+
+      const validarEnderecoGPS = (endGPS, endLoja) => {
+        setGpsValidando(true);
+        try {
+          const ok = enderecoCoincide(endLoja, endGPS);
+          setGpsConfereEndereco(ok);
+        } finally {
+          setGpsValidando(false);
+        }
+      };
+
       const capturarLocalizacao = () => {
         setGeoErro('');
         if (!('geolocation' in navigator)) {
@@ -191,7 +195,6 @@
             setCoords(c);
             setGeoStatus('ok');
 
-            // Auto-preencher alvo com localização atual (para facilitar testes)
             if (!alvoLat || !alvoLon) {
               setAlvoLat(latitude.toString());
               setAlvoLon(longitude.toString());
@@ -213,7 +216,11 @@
               const resp = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } });
               if (resp.ok) {
                 const data = await resp.json();
-                setEndereco(data.display_name || '');
+                const end = data.display_name || '';
+                setEnderecoGPS(end);
+                if (lojaEndereco.trim()) {
+                  validarEnderecoGPS(end, lojaEndereco);
+                }
               }
             } catch (e) {
               console.error('Erro ao buscar endereço:', e);
@@ -227,62 +234,77 @@
         );
       };
 
-      const StaticMap = ({ lat, lon }) => {
-        if (!lat || !lon) return null;
-        const marker = `&markers=${lat},${lon},lightblue1`;
-        const src = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=16&size=600x300&maptype=mapnik${marker}`;
-        return (
-          <div className="rounded overflow-hidden border">
-            <img src={src} alt="Mapa de check-in" className="w-full" />
-            <div className="text-xs text-gray-600 p-2">Fonte: OpenStreetMap</div>
-          </div>
-        );
-      };
+      // Perguntas CRUD
+      const proximoId = React.useMemo(
+        () => (perguntas.length ? Math.max(...perguntas.map(p => p.id)) + 1 : 1),
+        [perguntas]
+      );
 
-      // ----------------- Perguntas -----------------
       const adicionarPergunta = () => {
-        if (novaPergunta.trim()) {
-          setPerguntas((p) => [...p, novaPergunta.trim()]);
-          setNovaPergunta('');
-        }
+        if (!novaPergunta.trim()) return;
+        const cat = novaCategoria.trim() || 'Geral';
+        setPerguntas(p => [...p, {
+          id: proximoId,
+          categoria: cat,
+          texto: novaPergunta.trim(),
+          fotoObrigatoria: !!novaFotoObrigatoria
+        }]);
+        setNovaPergunta('');
+        setNovaCategoria('');
+        setNovaFotoObrigatoria(false);
       };
-      const removerPergunta = (index) => {
-        setPerguntas(perguntas.filter((_, i) => i !== index));
-      };
-      const iniciarEdicao = (index) => {
-        setEditandoIndex(index);
-        setTextoEdicao(perguntas[index]);
+      const removerPergunta = (id) => setPerguntas(perguntas.filter(p => p.id !== id));
+      const iniciarEdicao = (id) => {
+        const idx = perguntas.findIndex(p => p.id === id);
+        if (idx < 0) return;
+        setEditandoIndex(id);
+        setTextoEdicao(perguntas[idx].texto);
+        setCategoriaEdicao(perguntas[idx].categoria);
+        setFotoObrigatoriaEdicao(!!perguntas[idx].fotoObrigatoria);
       };
       const salvarEdicao = () => {
-        const novasPerguntas = [...perguntas];
-        novasPerguntas[editandoIndex] = textoEdicao;
-        setPerguntas(novasPerguntas);
+        if (editandoIndex == null) return;
+        const novas = perguntas.map(p => p.id === editandoIndex ? ({
+          ...p,
+          texto: textoEdicao.trim() || p.texto,
+          categoria: categoriaEdicao.trim() || 'Geral',
+          fotoObrigatoria: !!fotoObrigatoriaEdicao
+        }) : p);
+        setPerguntas(novas);
         setEditandoIndex(null);
         setTextoEdicao('');
+        setCategoriaEdicao('');
+        setFotoObrigatoriaEdicao(false);
       };
 
       // Evidências
-      const handleEvidenciaUpload = (index, file) => {
+      const handleEvidenciaUpload = (id, file) => {
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = (e) => {
-          setEvidencias((ev) => ({ ...ev, [index]: e.target.result }));
-        };
+        reader.onload = (e) => setEvidencias((ev) => ({ ...ev, [id]: e.target.result }));
         reader.readAsDataURL(file);
       };
 
-      // ----------------- Fluxo -----------------
+      // Fluxo
+      const responderPergunta = (id, resp) => setRespostas({ ...respostas, [id]: resp });
+
+      const requisitosAtendidosParaIniciar = () => {
+        if (!lojaNome.trim() || !lojaEndereco.trim()) return false;
+        if (!coords) return false;
+        // precisa estar dentro do raio e endereço GPS deve coincidir com o da loja
+        if (!dentroDaArea) return false;
+        if (gpsConfereEndereco !== true) return false;
+        if (perguntas.length === 0) return false;
+        return true;
+      };
+
       const iniciarChecklist = () => {
-        if (!lojaNome.trim() || !lojaEndereco.trim()) {
-          alert('Preencha os dados da loja (nome e endereço) antes de iniciar o checklist.');
-          return;
-        }
-        if (!coords) {
-          alert('Capture a localização (GPS) antes de iniciar o checklist.');
-          return;
-        }
-        if (!dentroDaArea) {
-          alert('Você não está dentro da área permitida para este check-in.');
+        if (!requisitosAtendidosParaIniciar()) {
+          let msg = 'Para iniciar: preencha dados da loja, capture GPS, esteja dentro da área e o endereço GPS deve coincidir com o da loja.';
+          if (gpsConfereEndereco === false) {
+            msg = 'O endereço obtido pelo GPS não coincide com o endereço da loja. Ajuste sua localização ou verifique o endereço da loja.';
+          }
+          alert(msg);
           return;
         }
         setChecklistIniciado(true);
@@ -291,20 +313,19 @@
         setFimISO(null);
       };
 
-      const responderPergunta = (index, resposta) => {
-        setRespostas({ ...respostas, [index]: resposta });
-      };
-
-      const todasRespondidas = perguntas.every((_, index) => respostas[index]);
-      const todasEvidencias = perguntas.every((_, index) => evidencias[index]);
+      const todasRespondidas = perguntas.every((p) => respostas[p.id]);
+      const evidenciasOk = perguntas.every((p) => {
+        if (p.fotoObrigatoria) return !!evidencias[p.id];
+        return true;
+      });
 
       const finalizarChecklist = () => {
         if (!todasRespondidas) {
           alert('Responda todas as perguntas.');
           return;
         }
-        if (!todasEvidencias) {
-          alert('Anexe/registre foto de evidência para todos os itens.');
+        if (!evidenciasOk) {
+          alert('Há itens com foto obrigatória sem evidência anexada.');
           return;
         }
         setFimISO(new Date().toISOString());
@@ -312,9 +333,9 @@
       };
 
       const calcularNota = () => {
-        const totalPerguntas = perguntas.length;
-        const respostasPositivas = Object.values(respostas).filter((r) => r === 'sim').length;
-        return totalPerguntas > 0 ? ((respostasPositivas / totalPerguntas) * 10).toFixed(1) : '0.0';
+        const total = perguntas.length;
+        const pos = perguntas.filter(p => respostas[p.id] === 'sim').length;
+        return total > 0 ? ((pos / total) * 10).toFixed(1) : '0.0';
       };
 
       const reiniciar = () => {
@@ -323,42 +344,72 @@
         setRespostas({});
         setEvidencias({});
         setCoords(null);
-        setEndereco('');
+        setEnderecoGPS('');
         setGeoStatus('idle');
         setGeoErro('');
         setDistancia(null);
         setDentroDaArea(false);
+        setGpsConfereEndereco(null);
         setInicioISO(null);
         setFimISO(null);
         setAlvoLat('');
         setAlvoLon('');
       };
 
-      // ------- Importação via CSV (Excel -> Salvar como CSV) -------
+      // CSV parsing
       const detectarDelimitador = (text) => {
         const primeiroBloco = text.split(/\r?\n/).slice(0, 5).join('\n');
-        const contaPontoEVirgula = (primeiroBloco.match(/;/g) || []).length;
-        const contaVirgula = (primeiroBloco.match(/,/g) || []).length;
-        const contaTab = (primeiroBloco.match(/\t/g) || []).length;
-        if (contaPontoEVirgula >= contaVirgula && contaPontoEVirgula >= contaTab) return ';';
-        if (contaVirgula >= contaPontoEVirgula && contaVirgula >= contaTab) return ',';
+        const c1 = (primeiroBloco.match(/;/g) || []).length;
+        const c2 = (primeiroBloco.match(/,/g) || []).length;
+        const c3 = (primeiroBloco.match(/\t/g) || []).length;
+        if (c1 >= c2 && c1 >= c3) return ';';
+        if (c2 >= c1 && c2 >= c3) return ',';
         return '\t';
       };
 
-      const parseCSV = (text) => {
-        const linhas = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+      const parseBooleanLoose = (v) => {
+        const t = normalizarTexto(v);
+        return ['sim','yes','true','1'].includes(t);
+      };
+
+      // Suporta:
+      // - CSV com cabeçalho: categoria,pergunta,foto_obrigatoria
+      // - CSV simples: apenas perguntas (sem categoria => 'Geral', foto_obrigatoria=false)
+      const parseCSVToPerguntas = (text) => {
+        const linhas = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
         if (linhas.length === 0) return [];
         const delim = detectarDelimitador(text);
-        const possivelCabecalho = linhas[0].split(delim).map((c) => c.trim().toLowerCase());
-        const temCabecalhoPergunta = possivelCabecalho.some((h) => ['pergunta', 'perguntas', 'question', 'questions', 'item'].includes(h));
-        const start = temCabecalhoPergunta ? 1 : 0;
-        const lista = [];
-        for (let i = start; i < linhas.length; i++) {
-          const cols = linhas[i].split(delim).map((c) => c.trim());
-          const cell = cols.find((c) => c.length > 0);
-          if (cell) lista.push(cell);
+
+        const headerCells = linhas[0].split(delim).map(c => normalizarTexto(c));
+        const hasHeader = ['categoria','pergunta','perguntas','foto_obrigatoria','foto obrigatoria','foto-obrigatoria','foto obrigatoria?'].some(h => headerCells.includes(h));
+
+        const out = [];
+        if (hasHeader) {
+          const idxCategoria = headerCells.findIndex(h => h === 'categoria');
+          const idxPergunta = headerCells.findIndex(h => ['pergunta','perguntas'].includes(h));
+          const idxFoto = headerCells.findIndex(h => ['foto_obrigatoria','foto obrigatoria','foto-obrigatoria','foto obrigatoria?'].includes(h));
+          for (let i = 1; i < linhas.length; i++) {
+            const cols = linhas[i].split(delim).map(c => c.trim());
+            const texto = idxPergunta >= 0 ? (cols[idxPergunta] || '') : '';
+            if (!texto) continue;
+            const categoria = idxCategoria >= 0 ? (cols[idxCategoria] || 'Geral') : 'Geral';
+            const fotoObrigatoria = idxFoto >= 0 ? parseBooleanLoose(cols[idxFoto] || 'não') : false;
+            out.push({ categoria, texto, fotoObrigatoria });
+          }
+        } else {
+          // Sem cabeçalho: cada linha é uma pergunta
+          for (const l of linhas) {
+            out.push({ categoria: 'Geral', texto: l, fotoObrigatoria: false });
+          }
         }
-        return Array.from(new Set(lista));
+        // remover duplicados por texto+categoria
+        const uniq = [];
+        const seen = new Set();
+        for (const p of out) {
+          const key = normalizarTexto(`${p.categoria}__${p.texto}`);
+          if (!seen.has(key)) { seen.add(key); uniq.push(p); }
+        }
+        return uniq;
       };
 
       const handleArquivoCSV = (file) => {
@@ -366,30 +417,43 @@
         if (!file) return;
         const isCSV = file.name.toLowerCase().endsWith('.csv');
         if (!isCSV) {
-          setUploadErro('Formato não suportado. Por favor, exporte seu Excel como CSV (.csv).');
+          setUploadErro('Formato não suportado. Exporte seu Excel como CSV (.csv).');
           return;
         }
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
             const text = e.target.result;
-            const novas = parseCSV(text);
-            if (novas.length === 0) {
-              setUploadErro('Não foram encontradas perguntas no arquivo. Verifique se há uma coluna com as perguntas.');
+            const dados = parseCSVToPerguntas(text);
+            if (dados.length === 0) {
+              setUploadErro('Nenhuma pergunta válida encontrada no CSV.');
               return;
             }
-            setPerguntas(novas);
+            // Mapear para estrutura com id
+            let idBase = 1;
+            const novos = dados.map((d, i) => ({
+              id: i + 1,
+              categoria: d.categoria || 'Geral',
+              texto: d.texto,
+              fotoObrigatoria: !!d.fotoObrigatoria
+            }));
+            setPerguntas(novos);
             setRespostas({});
             setEvidencias({});
           } catch (err) {
-            setUploadErro('Falha ao processar o arquivo CSV. Erro: ' + err.message);
+            setUploadErro('Falha ao processar o CSV. ' + err.message);
           }
         };
         reader.readAsText(file, 'utf-8');
       };
 
       const baixarModeloCSV = () => {
-        const linhas = ['pergunta', 'Item 1 está conforme?', 'Item 2 foi verificado?', 'EPIs conferidos?'];
+        const linhas = [
+          'categoria;pergunta;foto_obrigatoria',
+          'Segurança;EPIs conferidos?;sim',
+          'Operação;Equipamentos verificados?;nao',
+          'Documentação;Documentos atualizados?;nao'
+        ];
         const csv = linhas.join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
@@ -402,21 +466,31 @@
         URL.revokeObjectURL(url);
       };
 
-      // ----------------- Telas -----------------
+      // Agrupamento por categoria
+      const categorias = React.useMemo(() => {
+        const map = new Map();
+        for (const p of perguntas) {
+          if (!map.has(p.categoria)) map.set(p.categoria, []);
+          map.get(p.categoria).push(p);
+        }
+        // ordenar por nome e manter ordem de inserção por id
+        return Array.from(map.entries()).sort((a,b) => a[0].localeCompare(b[0]));
+      }, [perguntas]);
+
+      // Telas
       if (checklistFinalizado) {
         const nota = calcularNota();
-        const totalPerguntas = perguntas.length;
-        const respostasPositivas = Object.values(respostas).filter((r) => r === 'sim').length;
+        const total = perguntas.length;
+        const pos = perguntas.filter(p => respostas[p.id] === 'sim').length;
         const duracao = inicioISO && fimISO ? duracaoHumana(new Date(fimISO) - new Date(inicioISO)) : '';
 
         return (
           <div className="min-h-screen bg-gradient-to-br from-green-400 to-blue-500 p-4 print:bg-white print:p-0">
-            <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-2xl p-4 sm:p-8 print:shadow-none">
+            <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-2xl p-4 sm:p-8 print:shadow-none">
               <h1 className="text-2xl sm:text-3xl font-bold text-center mb-4 sm:mb-6 text-green-600">
                 <i className="fas fa-file-alt mr-2"></i>Relatório do Checklist
               </h1>
 
-              {/* Dados da Loja */}
               <div className="mb-4 sm:mb-6 bg-blue-50 p-4 rounded-lg">
                 <h3 className="font-bold text-base sm:text-lg mb-2 text-blue-700">
                   <i className="fas fa-store mr-2"></i>Dados da Loja
@@ -436,7 +510,7 @@
                     <div className="mt-2 space-y-1">
                       <div className="break-all"><strong>Lat:</strong> {coords.latitude.toFixed(6)} | <strong>Lon:</strong> {coords.longitude.toFixed(6)}</div>
                       {coords.accuracy && (<div><strong>Precisão:</strong> ±{Math.round(coords.accuracy)} m</div>)}
-                      {endereco && (<div className="break-words"><strong>Endereço GPS:</strong> {endereco}</div>)}
+                      {enderecoGPS && (<div className="break-words"><strong>Endereço GPS:</strong> {enderecoGPS}</div>)}
                       {distancia != null && (
                         <div>
                           <strong>Distância ao alvo:</strong> {Math.round(distancia)} m | <strong>Status:</strong> {dentroDaArea ? 'Dentro da área' : 'Fora da área'}
@@ -447,36 +521,42 @@
                 </div>
               </div>
 
-              {coords && (
-                <div className="mb-4 sm:mb-6">
-                  <StaticMap lat={coords.latitude} lon={coords.longitude} />
-                </div>
-              )}
-
               <div className="bg-green-50 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 text-center">
                 <h2 className="text-4xl sm:text-5xl font-bold text-green-600 mb-2">{nota}</h2>
-                <p className="text-sm sm:text-base text-gray-600">Nota Final — {respostasPositivas} de {totalPerguntas} respostas positivas</p>
+                <p className="text-sm sm:text-base text-gray-600">Nota Final — {pos} de {total} respostas positivas</p>
               </div>
 
               <div className="mb-4 sm:mb-6">
-                <h3 className="font-bold text-base sm:text-lg mb-3">Resumo das Respostas e Evidências</h3>
-                <div className="space-y-2">
-                  {perguntas.map((pergunta, index) => (
-                    <div key={index} className="p-3 bg-gray-50 rounded">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                        <div className="flex-1">
-                          <div className="text-sm font-semibold mb-1 break-words">{index + 1}. {pergunta}</div>
-                          <div className={`text-sm font-bold ${respostas[index] === 'sim' ? 'text-green-600' : 'text-red-600'}`}>
-                            {respostas[index] === 'sim' ? '✓ SIM' : '✗ NÃO'}
+                <h3 className="font-bold text-base sm:text-lg mb-3">Resumo por Categoria</h3>
+                <div className="space-y-4">
+                  {categorias.map(([cat, itens]) => (
+                    <div key={cat} className="border rounded-lg">
+                      <div className="px-3 py-2 bg-gray-100 font-semibold">{cat}</div>
+                      <div className="p-3 space-y-2">
+                        {itens.map((p) => (
+                          <div key={p.id} className="p-3 bg-gray-50 rounded">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                              <div className="flex-1">
+                                <div className="text-sm font-semibold mb-1 break-words">{p.texto}</div>
+                                <div className={`text-sm font-bold ${respostas[p.id] === 'sim' ? 'text-green-600' : 'text-red-600'}`}>
+                                  {respostas[p.id] === 'sim' ? '✓ SIM' : '✗ NÃO'}
+                                </div>
+                                {p.fotoObrigatoria && (
+                                  <div className="mt-1 badge bg-yellow-100 text-yellow-700">
+                                    <i className="fas fa-camera mr-1"></i>Foto obrigatória
+                                  </div>
+                                )}
+                              </div>
+                              <div className="w-full sm:w-40 text-center">
+                                {evidencias[p.id] ? (
+                                  <img src={evidencias[p.id]} alt={`Evidência ${p.id}`} className="w-full sm:w-40 h-28 object-cover rounded border mx-auto" />
+                                ) : (
+                                  <div className="text-xs text-gray-500">Sem evidência</div>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="w-full sm:w-40 text-center">
-                          {evidencias[index] ? (
-                            <img src={evidencias[index]} alt={`Evidência ${index + 1}`} className="w-full sm:w-40 h-28 object-cover rounded border mx-auto" />
-                          ) : (
-                            <div className="text-xs text-gray-500">Sem evidência</div>
-                          )}
-                        </div>
+                        ))}
                       </div>
                     </div>
                   ))}
@@ -484,16 +564,10 @@
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 print:hidden">
-                <button
-                  onClick={() => window.print()}
-                  className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition"
-                >
+                <button onClick={() => window.print()} className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition">
                   <i className="fas fa-print mr-2"></i>Imprimir / Salvar em PDF
                 </button>
-                <button
-                  onClick={reiniciar}
-                  className="flex-1 bg-blue-500 text-white py-3 rounded-lg font-bold hover:bg-blue-600 transition"
-                >
+                <button onClick={reiniciar} className="flex-1 bg-blue-500 text-white py-3 rounded-lg font-bold hover:bg-blue-600 transition">
                   <i className="fas fa-redo mr-2"></i>Novo Checklist
                 </button>
               </div>
@@ -503,17 +577,13 @@
       }
 
       if (checklistIniciado) {
-        const todasRespondidas = perguntas.every((_, index) => respostas[index]);
-        const todasEvidencias = perguntas.every((_, index) => evidencias[index]);
-
         return (
           <div className="min-h-screen bg-gradient-to-br from-purple-400 to-pink-500 p-4">
-            <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-2xl p-4 sm:p-8">
+            <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-2xl p-4 sm:p-8">
               <h1 className="text-2xl sm:text-3xl font-bold text-center mb-4 sm:mb-6 text-purple-600">
                 <i className="fas fa-clipboard-check mr-2"></i>Checklist em Andamento
               </h1>
 
-              {/* Dados da Loja */}
               <div className="mb-4 bg-blue-50 p-3 rounded-lg">
                 <h3 className="font-bold text-sm mb-2 text-blue-700">
                   <i className="fas fa-store mr-2"></i>Loja: {lojaNome}
@@ -521,56 +591,50 @@
                 <div className="text-xs text-gray-700">{lojaEndereco}</div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 mb-4 sm:mb-6">
-                {coords && (
-                  <div>
-                    <div className="text-xs text-gray-700 mb-2 space-y-1">
-                      <div className="break-all"><strong>Lat:</strong> {coords.latitude.toFixed(6)} | <strong>Lon:</strong> {coords.longitude.toFixed(6)}</div>
-                      {endereco && (<div className="break-words"><strong>Endereço GPS:</strong> {endereco}</div>)}
-                    </div>
-                    <StaticMap lat={coords.latitude} lon={coords.longitude} />
-                  </div>
-                )}
-              </div>
+              <div className="space-y-6 mb-6">
+                {categorias.map(([cat, itens]) => (
+                  <div key={cat} className="border rounded-lg">
+                    <div className="px-3 py-2 bg-gray-100 font-semibold">{cat}</div>
+                    <div className="p-3 space-y-4">
+                      {itens.map((p) => (
+                        <div key={p.id} className="bg-gray-50 p-3 sm:p-4 rounded-lg">
+                          <p className="font-semibold mb-3 text-sm sm:text-base break-words">{p.texto}</p>
+                          <div className="flex flex-col gap-3">
+                            <div className="flex gap-3">
+                              <button
+                                onClick={() => responderPergunta(p.id, 'sim')}
+                                className={`flex-1 py-2 rounded-lg font-bold transition text-sm sm:text-base ${
+                                  respostas[p.id] === 'sim' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-green-100'
+                                }`}
+                              >
+                                <i className="fas fa-check mr-1 sm:mr-2"></i>SIM
+                              </button>
+                              <button
+                                onClick={() => responderPergunta(p.id, 'nao')}
+                                className={`flex-1 py-2 rounded-lg font-bold transition text-sm sm:text-base ${
+                                  respostas[p.id] === 'nao' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-red-100'
+                                }`}
+                              >
+                                <i className="fas fa-times mr-1 sm:mr-2"></i>NÃO
+                              </button>
+                            </div>
 
-              <div className="space-y-4 mb-4 sm:mb-6">
-                {perguntas.map((pergunta, index) => (
-                  <div key={index} className="bg-gray-50 p-3 sm:p-4 rounded-lg">
-                    <p className="font-semibold mb-3 text-sm sm:text-base break-words">{index + 1}. {pergunta}</p>
-                    <div className="flex flex-col gap-3">
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => responderPergunta(index, 'sim')}
-                          className={`flex-1 py-2 rounded-lg font-bold transition text-sm sm:text-base ${
-                            respostas[index] === 'sim'
-                              ? 'bg-green-500 text-white'
-                              : 'bg-gray-200 text-gray-700 hover:bg-green-100'
-                          }`}
-                        >
-                          <i className="fas fa-check mr-1 sm:mr-2"></i>SIM
-                        </button>
-                        <button
-                          onClick={() => responderPergunta(index, 'nao')}
-                          className={`flex-1 py-2 rounded-lg font-bold transition text-sm sm:text-base ${
-                            respostas[index] === 'nao'
-                              ? 'bg-red-500 text-white'
-                              : 'bg-gray-200 text-gray-700 hover:bg-red-100'
-                          }`}
-                        >
-                          <i className="fas fa-times mr-1 sm:mr-2"></i>NÃO
-                        </button>
-                      </div>
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                        <label className="text-xs text-gray-600 whitespace-nowrap">Foto de evidência:</label>
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          capture="environment"
-                          onChange={(e) => handleEvidenciaUpload(index, e.target.files[0])} 
-                          className="text-xs w-full sm:w-auto"
-                        />
-                        {evidencias[index] && <span className="text-green-600 text-xs whitespace-nowrap"><i className="fas fa-check mr-1"></i>Anexada</span>}
-                      </div>
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                              <label className="text-xs text-gray-600 whitespace-nowrap">
+                                Foto de evidência {p.fotoObrigatoria && <span className="text-yellow-700 font-semibold">(obrigatória)</span>}:
+                              </label>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                onChange={(e) => handleEvidenciaUpload(p.id, e.target.files[0])}
+                                className="text-xs w-full sm:w-auto"
+                              />
+                              {evidencias[p.id] && <span className="text-green-600 text-xs whitespace-nowrap"><i className="fas fa-check mr-1"></i>Anexada</span>}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -578,9 +642,13 @@
 
               <button
                 onClick={finalizarChecklist}
-                disabled={!todasRespondidas || !todasEvidencias}
+                disabled={
+                  !perguntas.every(p => respostas[p.id]) ||
+                  !perguntas.every(p => (p.fotoObrigatoria ? !!evidencias[p.id] : true))
+                }
                 className={`w-full py-3 rounded-lg font-bold transition text-sm sm:text-base ${
-                  (todasRespondidas && todasEvidencias)
+                  (perguntas.every(p => respostas[p.id]) &&
+                   perguntas.every(p => (p.fotoObrigatoria ? !!evidencias[p.id] : true)))
                     ? 'bg-purple-500 text-white hover:bg-purple-600'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
@@ -595,7 +663,7 @@
       // Tela inicial
       return (
         <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-500 p-4">
-          <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-2xl p-4 sm:p-8">
+          <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-2xl p-4 sm:p-8">
             <h1 className="text-2xl sm:text-4xl font-bold text-center mb-6 sm:mb-8 text-blue-600">
               <i className="fas fa-tasks mr-2 sm:mr-3"></i>Checklist Auditoria
             </h1>
@@ -624,18 +692,14 @@
                     value={lojaEndereco}
                     onChange={(e) => setLojaEndereco(e.target.value)}
                     onBlur={(e) => salvarLojaEndereco(e.target.value)}
-                    placeholder="Ex.: Rua das Flores, 123 - Centro"
+                    placeholder="Ex.: Rua das Flores, 123 - Centro, Cidade/UF"
                     className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
                   />
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    salvarLojaNome(lojaNome);
-                    salvarLojaEndereco(lojaEndereco);
-                    alert('Dados da loja salvos com sucesso!');
-                  }}
+                  onClick={() => { salvarLojaNome(lojaNome); salvarLojaEndereco(lojaEndereco); alert('Dados da loja salvos!'); }}
                   className="bg-blue-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-600 transition text-sm"
                 >
                   <i className="fas fa-save mr-2"></i>Salvar Agora
@@ -644,7 +708,7 @@
               </div>
             </div>
 
-            {/* 2. Localização GPS */}
+            {/* 2. Localização GPS e Validação com Endereço da Loja */}
             <div className="mb-6 sm:mb-8 bg-indigo-50 p-4 sm:p-6 rounded-lg">
               <h2 className="text-xl sm:text-2xl font-bold mb-4 text-indigo-700">
                 <i className="fas fa-map-marker-alt mr-2"></i>2. Localização GPS
@@ -656,61 +720,73 @@
                 >
                   <i className="fas fa-location-arrow mr-2"></i>Capturar Localização
                 </button>
-                {geoStatus === 'buscando' && (
-                  <span className="text-xs sm:text-sm text-gray-600 animate-pulse">Buscando…</span>
-                )}
-                {geoStatus === 'ok' && (
-                  <span className="text-xs sm:text-sm text-green-600"><i className="fas fa-check-circle mr-1"></i>Capturada</span>
-                )}
+                {geoStatus === 'buscando' && (<span className="text-xs sm:text-sm text-gray-600 animate-pulse">Buscando…</span>)}
+                {geoStatus === 'ok' && (<span className="text-xs sm:text-sm text-green-600"><i className="fas fa-check-circle mr-1"></i>Capturada</span>)}
               </div>
 
-              {geoErro && (
-                <div className="mb-3 text-xs sm:text-sm text-red-600 bg-red-50 p-2 rounded">
-                  {geoErro}
-                </div>
-              )}
+              {geoErro && (<div className="mb-3 text-xs sm:text-sm text-red-600 bg-red-50 p-2 rounded">{geoErro}</div>)}
 
               {coords && (
-                <div>
-                  <div className="text-xs sm:text-sm text-gray-700 mb-2 space-y-1">
-                    <div className="break-all"><strong>Lat:</strong> {coords.latitude.toFixed(6)} | <strong>Lon:</strong> {coords.longitude.toFixed(6)}</div>
-                    {coords.accuracy && (<div><strong>Precisão:</strong> ±{Math.round(coords.accuracy)} m</div>)}
-                    {endereco && (<div className="break-words"><strong>Endereço GPS:</strong> {endereco}</div>)}
-                    {distancia != null && (
-                      <div className={`font-semibold ${dentroDaArea ? 'text-green-600' : 'text-red-600'}`}>
-                        Distância: {Math.round(distancia)} m — {dentroDaArea ? 'Dentro' : 'Fora'} da área
-                      </div>
-                    )}
+                <div className="text-xs sm:text-sm text-gray-700 mb-2 space-y-1">
+                  <div className="break-all"><strong>Lat:</strong> {coords.latitude.toFixed(6)} | <strong>Lon:</strong> {coords.longitude.toFixed(6)}</div>
+                  {coords.accuracy && (<div><strong>Precisão:</strong> ±{Math.round(coords.accuracy)} m</div>)}
+                  {enderecoGPS && (<div className="break-words"><strong>Endereço GPS:</strong> {enderecoGPS}</div>)}
+                  <div className={`font-semibold ${gpsConfereEndereco === true ? 'text-green-700' : gpsConfereEndereco === false ? 'text-red-700' : 'text-gray-600'}`}>
+                    {gpsValidando ? 'Validando endereço...' :
+                      gpsConfereEndereco === true ? 'Endereço GPS confere com o endereço da loja.' :
+                      gpsConfereEndereco === false ? 'Endereço GPS NÃO confere com o endereço da loja.' :
+                      'Capture a localização para validar com o endereço da loja.'
+                    }
                   </div>
-                  <StaticMap lat={coords.latitude} lon={coords.longitude} />
+                  {distancia != null && (
+                    <div className={`font-semibold ${dentroDaArea ? 'text-green-600' : 'text-red-600'}`}>
+                      Distância: {Math.round(distancia)} m — {dentroDaArea ? 'Dentro' : 'Fora'} da área
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* 3. Gerenciar Perguntas */}
+            {/* 3. Gerenciar Perguntas (com categorias e foto obrigatória) */}
             <div className="mb-6 sm:mb-8 bg-purple-50 p-4 sm:p-6 rounded-lg">
               <h2 className="text-xl sm:text-2xl font-bold mb-1 text-purple-700">
                 <i className="fas fa-edit mr-2"></i>3. Gerenciar Perguntas
               </h2>
-              <p className="text-xs sm:text-sm text-gray-600 mb-4">Dica: para usar Excel, salve sua planilha como CSV (Arquivo → Salvar como → CSV UTF-8) e importe abaixo.</p>
+              <p className="text-xs sm:text-sm text-gray-600 mb-4">
+                CSV com cabeçalho recomendado: categoria;pergunta;foto_obrigatoria (valores: sim/não).
+              </p>
 
               <div className="flex flex-col gap-3 mb-4">
-                <div className="flex gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+                  <input
+                    type="text"
+                    value={novaCategoria}
+                    onChange={(e) => setNovaCategoria(e.target.value)}
+                    placeholder="Categoria (ex.: Segurança)"
+                    className="md:col-span-3 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm sm:text-base"
+                  />
                   <input
                     type="text"
                     value={novaPergunta}
                     onChange={(e) => setNovaPergunta(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && adicionarPergunta()}
+                    onKeyPress={(e) => e.key === 'Enter' && adicionarPergunta()}"
                     placeholder="Digite uma nova pergunta..."
-                    className="flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm sm:text-base"
+                    className="md:col-span-7 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm sm:text-base"
                   />
+                  <label className="md:col-span-2 flex items-center gap-2 px-2 text-sm">
+                    <input type="checkbox" checked={novaFotoObrigatoria} onChange={(e) => setNovaFotoObrigatoria(e.target.checked)} />
+                    Foto obrigatória
+                  </label>
+                </div>
+                <div className="flex gap-2">
                   <button
                     onClick={adicionarPergunta}
                     className="bg-purple-500 text-white px-4 sm:px-6 py-2 rounded-lg font-bold hover:bg-purple-600 transition text-sm sm:text-base whitespace-nowrap"
                   >
-                    <i className="fas fa-plus mr-0 sm:mr-2"></i><span className="hidden sm:inline">Adicionar</span>
+                    <i className="fas fa-plus mr-2"></i>Adicionar
                   </button>
                 </div>
+
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <input
                     type="file"
@@ -735,7 +811,7 @@
                 </div>
               )}
 
-              {/* Seção para salvar e carregar conjuntos de perguntas */}
+              {/* Conjuntos salvos */}
               <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div className="bg-white p-3 rounded-lg border">
                   <div className="font-semibold text-sm mb-2">💾 Salvar perguntas como conjunto</div>
@@ -761,7 +837,7 @@
                       Salvar
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">Dica: importe um CSV, revise/edite as perguntas e salve este conjunto nomeado.</p>
+                  <p className="text-xs text-gray-500 mt-2">Dica: importe/edite e salve como conjunto nomeado.</p>
                 </div>
 
                 <div className="bg-white p-3 rounded-lg border">
@@ -773,14 +849,9 @@
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                     >
                       <option value="">Selecione um conjunto</option>
-                      {setsSalvos
-                        .sort((a,b) => (a.name.localeCompare(b.name)))
-                        .map(item => (
-                          <option key={item.name} value={item.name}>
-                            {item.name} ({item.count})
-                          </option>
-                        ))
-                      }
+                      {setsSalvos.sort((a,b) => a.name.localeCompare(b.name)).map(item => (
+                        <option key={item.name} value={item.name}>{item.name} ({item.count})</option>
+                      ))}
                     </select>
                     <button
                       onClick={() => {
@@ -790,7 +861,9 @@
                           alert('Conjunto vazio ou inválido.');
                           return;
                         }
-                        setPerguntas(lista);
+                        // garantir ids únicos
+                        const mapped = lista.map((p, i) => ({ ...p, id: i + 1, categoria: p.categoria || 'Geral', fotoObrigatoria: !!p.fotoObrigatoria }));
+                        setPerguntas(mapped);
                         setRespostas({});
                         setEvidencias({});
                         alert('Conjunto carregado!');
@@ -813,49 +886,47 @@
                       🗑️
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">Os conjuntos ficam salvos no seu navegador (localStorage).</p>
+                  <p className="text-xs text-gray-500 mt-2">Conjuntos salvos no seu navegador (localStorage).</p>
                 </div>
               </div>
 
+              {/* Lista editável */}
               <div className="space-y-2 mt-4">
-                {perguntas.map((pergunta, index) => (
-                  <div key={index} className="flex items-center gap-2 bg-white p-3 rounded-lg shadow">
-                    {editandoIndex === index ? (
+                {perguntas.map((p) => (
+                  <div key={p.id} className="flex items-center gap-2 bg-white p-3 rounded-lg shadow">
+                    {editandoIndex === p.id ? (
                       <>
+                        <input
+                          type="text"
+                          value={categoriaEdicao}
+                          onChange={(e) => setCategoriaEdicao(e.target.value)}
+                          placeholder="Categoria"
+                          className="w-40 px-2 sm:px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm sm:text-base"
+                        />
                         <input
                           type="text"
                           value={textoEdicao}
                           onChange={(e) => setTextoEdicao(e.target.value)}
                           className="flex-1 px-2 sm:px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm sm:text-base"
                         />
-                        <button
-                          onClick={salvarEdicao}
-                          className="bg-green-500 text-white px-2 sm:px-3 py-1 rounded hover:bg-green-600 text-sm sm:text-base"
-                        >
+                        <label className="flex items-center gap-2 text-sm">
+                          <input type="checkbox" checked={fotoObrigatoriaEdicao} onChange={(e) => setFotoObrigatoriaEdicao(e.target.checked)} />
+                          Foto obrigatória
+                        </label>
+                        <button onClick={salvarEdicao} className="bg-green-500 text-white px-2 sm:px-3 py-1 rounded hover:bg-green-600 text-sm sm:text-base">
                           <i className="fas fa-check"></i>
                         </button>
-                        <button
-                          onClick={() => setEditandoIndex(null)}
-                          className="bg-gray-500 text-white px-2 sm:px-3 py-1 rounded hover:bg-gray-600 text-sm sm:text-base"
-                        >
+                        <button onClick={() => setEditandoIndex(null)} className="bg-gray-500 text-white px-2 sm:px-3 py-1 rounded hover:bg-gray-600 text-sm sm:text-base">
                           <i className="fas fa-times"></i>
                         </button>
                       </>
                     ) : (
                       <>
-                        <span className="flex-1 text-sm sm:text-base break-words">{pergunta}</span>
-                        <button
-                          onClick={() => iniciarEdicao(index)}
-                          className="text-blue-500 hover:text-blue-700 px-2"
-                        >
-                          <i className="fas fa-edit"></i>
-                        </button>
-                        <button
-                          onClick={() => removerPergunta(index)}
-                          className="text-red-500 hover:text-red-700 px-2"
-                        >
-                          <i className="fas fa-trash"></i>
-                        </button>
+                        <span className="badge bg-gray-100 text-gray-700">{p.categoria || 'Geral'}</span>
+                        <span className="flex-1 text-sm sm:text-base break-words">{p.texto}</span>
+                        {p.fotoObrigatoria && <span className="badge bg-yellow-100 text-yellow-700"><i className="fas fa-camera mr-1"></i>Foto obrigatória</span>}
+                        <button onClick={() => iniciarEdicao(p.id)} className="text-blue-500 hover:text-blue-700 px-2"><i className="fas fa-edit"></i></button>
+                        <button onClick={() => removerPergunta(p.id)} className="text-red-500 hover:text-red-700 px-2"><i className="fas fa-trash"></i></button>
                       </>
                     )}
                   </div>
@@ -865,12 +936,13 @@
 
             <button
               onClick={iniciarChecklist}
-              disabled={!lojaNome.trim() || !lojaEndereco.trim() || !coords || !dentroDaArea || perguntas.length === 0}
+              disabled={!requisitosAtendidosParaIniciar() || gpsValidando}
               className={`w-full py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg transition ${
-                lojaNome.trim() && lojaEndereco.trim() && coords && dentroDaArea && perguntas.length > 0
+                requisitosAtendidosParaIniciar() && !gpsValidando
                   ? 'bg-green-500 text-white hover:bg-green-600'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
+              title={gpsConfereEndereco === false ? 'Endereço GPS não confere com o da loja' : ''}
             >
               <i className="fas fa-play-circle mr-2"></i>Iniciar Checklist
             </button>
