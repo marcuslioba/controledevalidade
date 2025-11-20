@@ -1,597 +1,1194 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Contas a Pagar — Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Controle Financeiro</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Importar Chart.js para os gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    
+    <style>
+        :root {
+            /* Variáveis do Tema Claro */
+            --color-primary-blue: #4f46e5;
+            --color-success-green: #10b981;
+            --color-danger-red: #ef4444;
+            --color-secondary-purple: #a855f7;
+            --color-background: #f3f4f6;
+            --color-surface: #ffffff;
+            --color-text-dark: #1f2937;
+            --color-text-light: #4b5563;
+            --border-radius-card: 12px;
+            --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
 
-  <!-- Fonts & Icons -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous"/>
+        /* Tema Escuro */
+        .dark-mode {
+            --color-background: #111827;
+            --color-surface: #1f2937;
+            --color-text-dark: #f9fafb;
+            --color-text-light: #d1d5db;
+            --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+        }
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
 
-  <style>
-    :root{
-      --bg:#0f1724;
-      --card:#0b1220;
-      --muted:#94a3b8;
-      --accent:#6c5ce7;
-      --green:#16a34a;
-      --red:#ef4444;
-      --glass: rgba(255,255,255,0.03);
-      --radius:14px;
-      font-family: 'Inter', system-ui, sans-serif;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;background:linear-gradient(180deg,#071021 0%,#0b1220 100%);color:#e6eef8;min-height:100vh}
-    .app{display:grid;grid-template-columns:260px 1fr;gap:20px;padding:20px;max-width:1200px;margin:24px auto}
+        body {
+            background-color: var(--color-background);
+            color: var(--color-text-dark);
+            min-height: 100vh;
+        }
 
-    /* SIDEBAR */
-    .sidebar{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
-    .brand{display:flex;gap:12px;align-items:center;margin-bottom:18px}
-    .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#34d399);display:flex;align-items:center;justify-content:center;font-weight:700;color:white}
-    .nav{display:flex;flex-direction:column;gap:6px}
-    .nav button{background:transparent;border:0;color:var(--muted);text-align:left;padding:10px;border-radius:10px;display:flex;gap:10px;align-items:center;cursor:pointer}
-    .nav button.active{background:linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));color:var(--accent)}
+        #app-header {
+            background-color: var(--color-surface);
+            padding: 16px 20px;
+            box-shadow: var(--shadow-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        #theme-toggle {
+            background: none;
+            border: 1px solid var(--color-text-light);
+            color: var(--color-text-dark);
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            transition: all 0.3s;
+        }
+        
+        #theme-toggle:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+        .dark-mode #theme-toggle:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
 
-    /* MAIN */
-    .main{padding:18px;border-radius:var(--radius);background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));box-shadow:0 6px 30px rgba(3,6,23,0.6)}
-    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
-    h1{margin:0;font-size:18px}
+        #app-container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
 
-    /* grid cards */
-    .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
-    .card{background:var(--glass);padding:14px;border-radius:12px;box-shadow:0 3px 12px rgba(2,6,23,0.4)}
-    .card .value{font-weight:700;font-size:18px}
-    .card small{color:var(--muted)}
+        /* Estilo para Cards */
+        .card {
+            background-color: var(--color-surface);
+            color: var(--color-text-dark);
+            border-radius: var(--border-radius-card);
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-light);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s;
+        }
 
-    /* mobile */
-    @media (max-width:900px){.app{grid-template-columns:1fr;padding:12px}.cards{grid-template-columns:repeat(2,1fr)}.sidebar{display:flex;overflow:auto;flex-direction:row;gap:10px;padding:10px}}
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+        }
+        .dark-mode .card:hover {
+             box-shadow: 0 10px 15px -3px rgba(255, 255, 255, 0.05), 0 4px 6px -4px rgba(255, 255, 255, 0.05);
+        }
 
-    /* forms and lists */
-    form{display:grid;gap:8px}
-    input,select{padding:10px;border-radius:10px;border:0;background:rgba(255,255,255,0.03);color:inherit}
-    .btn{padding:10px 12px;border-radius:10px;border:0;cursor:pointer}
-    .btn.primary{background:linear-gradient(90deg,var(--accent),#8b5cf6);color:#fff}
-    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
-    .list{display:flex;flex-direction:column;gap:8px}
-    .list-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;background:rgba(255,255,255,0.02)}
-    .chip{padding:6px 8px;border-radius:999px;font-size:12px}
-    .chip.in{background:rgba(22,163,74,0.12);color:var(--green)}
-    .chip.out{background:rgba(239,68,68,0.08);color:var(--red)}
-    .muted{color:var(--muted);font-size:13px}
-    .small{font-size:13px}
-    .actions button{border:0;background:transparent;color:var(--muted);cursor:pointer}
-    .filters{display:flex;gap:8px;margin-bottom:8px}
-    .filters button{padding:6px 10px;border-radius:999px;border:0;background:rgba(255,255,255,0.02);cursor:pointer}
-    .toast{position:fixed;right:20px;bottom:20px;background:linear-gradient(90deg,#111827,#0b1220);padding:12px;border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,0.7);display:none}
-    .toast.success{border-left:4px solid var(--green)}
-    .toast.error{border-left:4px solid var(--red)}
-    .hidden{display:none}
-    .table{width:100%;border-collapse:collapse}
-    .table th,.table td{padding:8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.02);font-size:14px}
-  </style>
+        /* Estilo para Botões */
+        button {
+            background-color: var(--color-primary-blue);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, opacity 0.3s;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #3730a3;
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn-success { background-color: var(--color-success-green); }
+        .btn-success:hover { background-color: #059669; }
+        .btn-danger { background-color: var(--color-danger-red); }
+        .btn-danger:hover { background-color: #dc2626; }
+        .btn-secondary { background-color: var(--color-text-light); }
+        .btn-secondary:hover { background-color: #6b7280; }
+
+        /* Estilo para Inputs e Forms */
+        input:not([type="radio"]),
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid var(--color-text-light);
+            background-color: var(--color-surface);
+            color: var(--color-text-dark);
+            border-radius: 6px;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus {
+            border-color: var(--color-primary-blue);
+            outline: none;
+        }
+
+        .error-message {
+            color: var(--color-danger-red);
+            margin-top: 10px;
+        }
+
+        /* --- Estilos Específicos do App --- */
+
+        /* Layout do Dashboard */
+        #summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        #dashboard-grid {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: 1fr;
+        }
+
+        @media (min-width: 1024px) {
+            #dashboard-grid {
+                grid-template-columns: 2fr 1fr; /* Gráficos mais largos */
+            }
+        }
+        
+        /* Layout de Tabelas */
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 15px;
+            border-radius: var(--border-radius-card);
+            overflow: hidden;
+        }
+        .data-table th, .data-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .dark-mode .data-table th, .dark-table .data-table td {
+            border-bottom: 1px solid #374151;
+        }
+        .data-table th {
+            background-color: var(--color-background);
+            color: var(--color-text-light);
+            font-weight: 600;
+        }
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+        .data-table tr:hover {
+            background-color: rgba(79, 70, 229, 0.05); /* Leve destaque */
+        }
+        .dark-mode .data-table tr:hover {
+            background-color: rgba(79, 70, 229, 0.1);
+        }
+        .data-table td button {
+            padding: 5px 10px;
+            margin-right: 5px;
+            font-size: 0.8rem;
+        }
+
+        /* Estilos de Status e Tipo */
+        .status-pago { color: var(--color-success-green); font-weight: bold; }
+        .status-pendente { color: var(--color-danger-red); font-weight: bold; }
+        .tipo-entrada { color: var(--color-success-green); }
+        .tipo-saida { color: var(--color-danger-red); }
+
+        /* --- Animação de Pulso (Feedback Visual) --- */
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 var(--color-success-green); }
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 var(--color-danger-red); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        
+        #new-account-form {
+            position: relative;
+            /* Garante que o box-shadow do pulso não seja cortado */
+        }
+
+        .pulse-green {
+            animation: pulse-green 0.5s ease-out;
+        }
+
+        .pulse-red {
+            animation: pulse-red 0.5s ease-out;
+        }
+        
+        /* Toast Notification */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .toast {
+            background-color: var(--color-surface);
+            color: var(--color-text-dark);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: var(--shadow-light);
+            margin-bottom: 10px;
+            min-width: 250px;
+            border-left: 5px solid;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .toast.success { border-color: var(--color-success-green); }
+        .toast.error { border-color: var(--color-danger-red); }
+        .toast.info { border-color: var(--color-primary-blue); }
+        
+        /* Estilo para a lista de Vencimentos */
+        #upcoming-accounts-list {
+            list-style: none;
+            padding: 0;
+        }
+        .upcoming-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .dark-mode .upcoming-item {
+            border-bottom: 1px solid #374151;
+        }
+        .upcoming-item:last-child { border-bottom: none; }
+    </style>
 </head>
 <body>
 
-<div class="app">
-  <aside class="sidebar">
-    <div class="brand">
-      <div class="logo">CA</div>
-      <div>
-        <div style="font-weight:700">ContasApp</div>
-        <div class="muted" style="font-size:12px">Financeiro simples</div>
-      </div>
-    </div>
+    <div id="toast-container"></div>
 
-    <nav class="nav" id="nav">
-      <button class="active" data-tab="dashboard"><span class="material-icons">dashboard</span> Dashboard</button>
-      <button data-tab="new"><span class="material-icons">add_circle</span> Cadastrar Conta</button>
-      <button data-tab="upcoming"><span class="material-icons">schedule</span> Próximos Vencimentos</button>
-      <button data-tab="categories"><span class="material-icons">category</span> Categorias</button>
-    </nav>
-
-    <div style="margin-top:18px" class="muted small">Dica: use filtros de 7/15/30 dias em Próximos Vencimentos.</div>
-  </aside>
-
-  <main class="main">
-    <div class="topbar">
-      <h1>Dashboard</h1>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn ghost" id="refreshBtn"><i class="fa fa-sync"></i> Atualizar</button>
-        <button class="btn primary" id="openNew">+ Nova Conta</button>
-      </div>
-    </div>
-
-    <section id="content">
-      <!-- DASHBOARD VIEW -->
-      <div id="dashboardView">
-        <div class="cards">
-          <div class="card">
-            <div class="muted">Total de contas (mês)</div>
-            <div class="value" id="totalMonth">R$ 0,00</div>
-          </div>
-          <div class="card">
-            <div class="muted">Total entradas</div>
-            <div class="value" id="totalIn">R$ 0,00</div>
-          </div>
-          <div class="card">
-            <div class="muted">Total saídas</div>
-            <div class="value" id="totalOut">R$ 0,00</div>
-          </div>
-          <div class="card" id="saldoCard" style="display:none">
-            <div class="muted">Saldo do mês</div>
-            <div class="value" id="saldo">R$ 0,00</div>
-          </div>
+    <header id="app-header">
+        <h1>Meu Controle Financeiro 💰</h1>
+        <div style="display: flex; gap: 10px;">
+            <button id="theme-toggle" title="Alternar Tema">
+                <span class="material-icons">dark_mode</span>
+            </button>
+            <button id="logout-btn" style="display:none;">Sair</button>
         </div>
+    </header>
 
-        <div style="display:grid;grid-template-columns:1fr 360px;gap:14px">
-          <div class="card">
-            <canvas id="chartArea" height="160"></canvas>
-          </div>
+    <main id="app-container">
+        <!-- Área de Login/Cadastro -->
+        <section id="login-area">
+            <h2>🔐 Login ou Cadastro</h2>
+            <form id="login-form" class="card">
+                <input type="email" id="login-email" placeholder="E-mail" required>
+                <input type="password" id="login-password" placeholder="Senha (mín. 6 caracteres)" required>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" style="flex: 1;">Entrar</button>
+                    <button type="button" id="signup-btn" class="btn-secondary" style="flex: 1;">Criar Conta</button>
+                </div>
+                <p id="auth-error" class="error-message"></p>
+            </form>
+        </section>
 
-          <div class="card">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-              <div class="muted">Próximos Vencimentos</div>
-              <div class="small muted">7 / 15 / 30 dias</div>
+        <!-- Área do Dashboard -->
+        <section id="dashboard-area" style="display:none;">
+            <div id="navigation-menu" style="margin-bottom: 20px;">
+                <button id="nav-dashboard" class="btn-secondary">Dashboard</button>
+                <button id="nav-categories" class="btn-secondary">Gerenciar Categorias</button>
             </div>
-            <div id="miniUpcoming" class="list"></div>
-            <div style="margin-top:12px;text-align:right"><button class="btn ghost" data-tab="upcoming">Ver todos</button></div>
-          </div>
-        </div>
+            
+            <!-- Visão: Dashboard Principal -->
+            <div id="view-dashboard">
+                <h2>📊 Dashboard</h2>
+                <div id="summary-cards">
+                    <!-- Cards de resumo (Saldo, Entradas, Saídas) serão injetados aqui -->
+                </div>
 
-        <div style="margin-top:14px" class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div><h3 class="small">Todas as Contas</h3><div class="muted">Lista completa de contas</div></div>
-          </div>
+                <div id="dashboard-grid">
+                    <!-- Gráficos -->
+                    <div class="card">
+                        <h3>Evolução Mensal (Entradas vs. Saídas)</h3>
+                        <canvas id="balanceChart" width="100%" height="50"></canvas>
+                    </div>
 
-          <div id="allAccounts"></div>
-        </div>
-      </div>
+                    <!-- Próximos Vencimentos -->
+                    <div class="card">
+                        <h3>🗓️ Próximos Vencimentos</h3>
+                        <div id="upcoming-filters" style="display: flex; gap: 5px; margin-bottom: 15px;">
+                            <button class="btn-secondary" data-days="7">7 dias</button>
+                            <button class="btn-secondary" data-days="15">15 dias</button>
+                            <button class="btn-secondary" data-days="30">30 dias</button>
+                        </div>
+                        <ul id="upcoming-accounts-list">
+                            <li style="color: var(--color-text-light);">Selecione um filtro ou cadastre contas.</li>
+                        </ul>
+                    </div>
+                </div>
 
-      <!-- NEW ACCOUNT VIEW -->
-      <div id="newView" style="display:none">
-        <div class="card">
-          <h2 class="small">Cadastrar Conta</h2>
-          <form id="accountForm" aria-label="Formulário de conta">
-            <input type="hidden" id="accountId" />
-            <label for="nome">Nome</label>
-            <input id="nome" required aria-required="true" />
-            <label for="categoria">Categoria</label>
-            <select id="categoria" aria-required="true"></select>
-            <label for="valor">Valor</label>
-            <input id="valor" type="number" step="0.01" required inputmode="decimal" aria-required="true" />
-            <label for="vencimento">Vencimento</label>
-            <input id="vencimento" type="date" required />
-            <label for="tipo">Tipo</label>
-            <select id="tipo"><option value="saida">Saída</option><option value="entrada">Entrada</option></select>
+                <!-- Formulário de Nova Conta -->
+                <div class="card">
+                    <h3>+ Cadastrar Novo Lançamento</h3>
+                    <form id="new-account-form">
+                        <div id="type-selector" style="margin-bottom: 15px;">
+                            <label style="font-weight: bold; margin-right: 15px;">Tipo:</label>
+                            <label><input type="radio" name="account-type" value="entrada" checked> Entrada (Receber)</label>
+                            <label><input type="radio" name="account-type" value="saida"> Saída (Pagar)</label>
+                        </div>
+                        
+                        <input type="text" id="account-name" placeholder="Nome do Lançamento (Ex: Salário, Aluguel)" required>
+                        <select id="account-category" required><option value="">Selecione a Categoria</option></select>
+                        <input type="text" id="account-value" placeholder="Valor (R$)" required>
+                        <input type="date" id="account-due-date" required>
+                        
+                        <input type="hidden" id="account-doc-id"> <!-- Para uso em edição -->
+                        
+                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button type="submit" id="save-account-btn" style="flex: 1;">Salvar Lançamento</button>
+                            <button type="button" id="cancel-edit-btn" class="btn-danger" style="display: none;">Cancelar Edição</button>
+                        </div>
+                    </form>
+                </div>
 
-            <label for="status">Pagamento</label>
-            <select id="status" aria-describedby="statusHelp"><option value="pendente">Agendar Pagamento</option><option value="pago">Pago</option></select>
-            <div id="statusHelp" class="muted small">Escolha se já foi pago ou se deve ser agendado</div>
-
-            <div id="repeatBlock" style="display:none">
-              <label for="repeticao">Repetir mensalmente?</label>
-              <select id="repeticao"><option value="nao">Não</option><option value="sim">Sim</option></select>
+                <!-- Lista de Lançamentos (Para Edição/Exclusão) -->
+                <div class="card">
+                    <h3>📋 Histórico de Lançamentos (Todas as Contas)</h3>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Valor</th>
+                                    <th>Tipo</th>
+                                    <th>Status</th>
+                                    <th>Vencimento</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="accounts-table-body">
+                                <tr><td colspan="6" style="text-align: center; color: var(--color-text-light);">Carregando lançamentos...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
+            
+            <!-- Visão: Gerenciar Categorias -->
+            <div id="view-categories" style="display: none;">
+                <h2>⚙️ Gerenciar Categorias</h2>
 
-            <div style="display:flex;gap:8px;margin-top:8px">
-              <button type="submit" class="btn primary" id="saveBtn">Salvar</button>
-              <button type="button" class="btn ghost" id="cancelEdit">Cancelar</button>
+                <!-- Formulário de Categoria -->
+                <div class="card" style="max-width: 400px;">
+                    <h3>+ Nova Categoria</h3>
+                    <form id="new-category-form">
+                        <input type="text" id="category-name" placeholder="Nome da Categoria (Ex: Alimentação, Renda Fixa)" required>
+                        <input type="hidden" id="category-doc-id"> <!-- Para Edição -->
+                        <div style="display: flex; gap: 10px;">
+                            <button type="submit" id="save-category-btn" style="flex: 1;">Salvar Categoria</button>
+                            <button type="button" id="cancel-category-btn" class="btn-danger" style="display: none;">Cancelar Edição</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Lista de Categorias -->
+                <div class="card">
+                    <h3>Lista de Categorias</h3>
+                    <table class="data-table" style="max-width: 600px;">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="categories-table-body">
+                            <tr><td colspan="2" style="text-align: center; color: var(--color-text-light);">Carregando categorias...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-          </form>
-        </div>
-      </div>
+        </section>
 
-      <!-- UPCOMING VIEW -->
-      <div id="upcomingView" style="display:none">
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div>
-              <h3 class="small">Próximos Vencimentos</h3>
-              <div class="muted">Filtrar por intervalo</div>
-            </div>
-            <div class="filters">
-              <button data-days="7" class="active">7 dias</button>
-              <button data-days="15">15 dias</button>
-              <button data-days="30">30 dias</button>
-            </div>
-          </div>
+    </main>
 
-          <div id="upcomingList" class="list"></div>
-        </div>
-      </div>
+    <script type="module">
+        // --- 0. CONFIGURAÇÃO FIREBASE E IMPORTS ---
 
-      <!-- CATEGORIES VIEW -->
-      <div id="categoriesView" style="display:none">
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <div><h3 class="small">Categorias</h3><div class="muted">Gerencie suas categorias</div></div>
-            <div><button id="addCat" class="btn primary">+ Categoria</button></div>
-          </div>
+        // Importar as funções necessárias do SDK do Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        // CORREÇÃO: Certificando-se de importar todas as funções de autenticação necessárias
+        import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-          <div id="categoriesList" class="list"></div>
-        </div>
-      </div>
+        // Variáveis globais (disponíveis no ambiente Canvas)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-    </section>
-  </main>
-</div>
+        // Inicializar o Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        let currentUserId = null;
+        let allAccountsData = []; // Armazena todos os lançamentos para uso em gráficos/listas
+        let accountsUnsubscribe = null; // Listener de contas
+        let categoriesUnsubscribe = null; // Listener de categorias
+        let myChart = null; // Instância do Chart.js
+        // Inicialização de coleções (serão ajustadas em `updateUI`)
+        let COLLECTION_ACCOUNTS = `artifacts/${appId}/users/default-user/contas`;
+        let COLLECTION_CATEGORIES = `artifacts/${appId}/users/default-user/categorias`;
 
-<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script>
-/* ==== CONFIG ==== */
-/* sua URL final do Web App */
-const API = 'https://script.google.com/macros/s/AKfycbzcVyhC_ASf70QFf00rfGXyjFYo39kc12NRCNAQCXBAzRSSoR8cVHthBKc5Er4sz7Kt/exec';
+        // --- 1. ELEMENTOS DO DOM ---
+        const loginArea = document.getElementById('login-area');
+        const dashboardArea = document.getElementById('dashboard-area');
+        const logoutBtn = document.getElementById('logout-btn');
+        const signupBtn = document.getElementById('signup-btn');
+        const authError = document.getElementById('auth-error');
+        const loginForm = document.getElementById('login-form');
+        const newAccountForm = document.getElementById('new-account-form');
+        const newCategoryForm = document.getElementById('new-category-form');
+        const typeSelector = document.getElementById('type-selector');
+        const accountValueInput = document.getElementById('account-value');
+        const balanceChartCanvas = document.getElementById('balanceChart');
+        const upcomingFilters = document.getElementById('upcoming-filters');
+        const upcomingAccountsList = document.getElementById('upcoming-accounts-list');
+        const accountsTableBody = document.getElementById('accounts-table-body');
+        const categoriesTableBody = document.getElementById('categories-table-body');
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const navDashboard = document.getElementById('nav-dashboard');
+        const navCategories = document.getElementById('nav-categories');
+        const viewDashboard = document.getElementById('view-dashboard');
+        const viewCategories = document.getElementById('view-categories');
 
-/* ==== HELPERS ==== */
-const $ = (s, p=document) => p.querySelector(s);
-const fmt = num => Number(num||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const todayISO = ()=> new Date().toISOString().slice(0,10);
+        // --- 2. HELPERS E UTILS ---
 
-let accounts = [];
-let categories = [];
-let chart = null;
-let currentFilterDays = 7;
+        /** Função para exibir notificações Toast */
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            
+            container.appendChild(toast);
+            
+            // Força o reflow para aplicar a transição
+            void toast.offsetWidth; 
+            toast.classList.add('show');
 
-/* Resolve nome da categoria com base em id ou nome recebido */
-function getCategoryName(ref){
-  if(!ref) return '';
-  // se for id, procurar na lista de categorias
-  const found = categories.find(c => String(c.id) === String(ref) || c.categoria === ref);
-  return found ? found.categoria : ref;
-}
+            setTimeout(() => {
+                toast.classList.remove('show');
+                toast.addEventListener('transitionend', () => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, { once: true });
+            }, 3000);
+        }
 
-/* ==== BOOT ==== */
-document.addEventListener('DOMContentLoaded', () => {
-  initNav();
-  setupForm();
-  bindUIButtons();
-  loadAll();
-});
+        /** Formata um número para o formato de moeda brasileira (R$ X.XXX,XX) */
+        function formatCurrency(value) {
+            if (typeof value !== 'number') return 'R$ 0,00';
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
 
-/* NAV */
-function initNav(){
-  document.querySelectorAll('#nav button').forEach(b => {
-    b.addEventListener('click', () => {
-      document.querySelectorAll('#nav button').forEach(x => x.classList.remove('active'));
-      b.classList.add('active');
-      openTab(b.dataset.tab);
-    });
-  });
-  // botões com data-tab (ex.: "Ver todos") também abrem
-  document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click', ()=>openTab(b.dataset.tab)));
-}
-function openTab(tab){
-  ['dashboard','new','upcoming','categories'].forEach(t=>{
-    const el = document.getElementById(t + 'View');
-    if(el) el.style.display = (t===tab ? 'block' : 'none');
-  });
-}
+        /** Converte string formatada (R$ 1.000,00) para número (1000.00) */
+        function parseCurrency(str) {
+            if (!str) return 0;
+            // Remove R$, pontos e substitui vírgula por ponto
+            return parseFloat(str.replace(/[^0-9,-]/g, '').replace(',', '.'));
+        }
 
-/* ==== API HELPERS (JSON + status check) ==== */
-async function request(method='GET', url=API, body){
-  const opts = { method, headers:{} };
-  if(method !== 'GET'){
-    opts.headers['Content-Type'] = 'application/json;charset=utf-8';
-    opts.body = JSON.stringify(body);
-  }
-  const res = await fetch(url + (method==='GET' && body ? `?${body}` : ''), opts);
-  if(!res.ok){
-    const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text}`);
-  }
-  return res.json();
-}
-async function apiGet(params=''){ return request('GET', API, params); }
-async function apiPost(body){ return request('POST', API, body); }
-async function apiPut(body){ return request('PUT', API, body); }
-async function apiDelete(body){ return request('DELETE', API, body); }
+        /** Formata o valor no input para R$ em tempo real */
+        accountValueInput.addEventListener('input', function(e) {
+            let value = e.target.value;
+            // Remove tudo que não for dígito e vírgula
+            value = value.replace(/\D/g, ''); 
+            
+            if (value.length === 0) {
+                e.target.value = '';
+                return;
+            }
+            
+            // Converte para float para formatar
+            let floatValue = parseInt(value, 10) / 100;
+            e.target.value = floatValue.toLocaleString('pt-BR', { 
+                style: 'currency', 
+                currency: 'BRL',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        });
 
-/* ==== LOAD & RENDER ==== */
-async function loadAll(){
-  showToast('Carregando dados...');
-  try{
-    const [contasResp, catsResp] = await Promise.all([
-      apiGet('action=listarContas'),
-      apiGet('action=listarCategorias')
-    ]);
-    accounts = Array.isArray(contasResp) ? contasResp : (contasResp && contasResp.contas) ? contasResp.contas : [];
-    categories = Array.isArray(catsResp) ? catsResp : (catsResp && catsResp.categorias) ? catsResp.categorias : [];
-    renderDashboard();
-    renderCategories();
-    renderUpcomingMini();
-    renderAllAccounts();
-    hideToast();
-  }catch(err){
-    showToast('Erro ao carregar: ' + (err.message || err), 4000, 'error');
-  }
-}
+        /** Adiciona feedback visual (pulso) ao selecionar o tipo */
+        document.querySelectorAll('input[name="account-type"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const type = e.target.value;
+                const pulseClass = type === 'entrada' ? 'pulse-green' : 'pulse-red';
+                
+                // Remove qualquer classe de pulso existente
+                typeSelector.classList.remove('pulse-green', 'pulse-red');
+                
+                // Força o reflow para reiniciar a animação
+                void typeSelector.offsetWidth; 
 
-function renderDashboard(){
-  const now = new Date();
-  const month = now.getMonth();
-  const year = now.getFullYear();
-  const monthAccounts = accounts.filter(a=>{
-    const d = new Date(a.vencimento);
-    return d.getMonth()===month && d.getFullYear()===year;
-  });
+                // Adiciona a nova classe de pulso
+                typeSelector.classList.add(pulseClass);
 
-  const totalMonth = monthAccounts.reduce((s,a)=>s+Number(a.valor||0),0);
-  const totalIn = monthAccounts.filter(a=>a.tipo==='entrada').reduce((s,a)=>s+Number(a.valor||0),0);
-  const totalOut = monthAccounts.filter(a=>a.tipo==='saida').reduce((s,a)=>s+Number(a.valor||0),0);
+                // Remove a classe após a animação (para que possa pulsar novamente)
+                setTimeout(() => {
+                    typeSelector.classList.remove(pulseClass);
+                }, 500); 
+            });
+        });
 
-  $('#totalMonth').textContent = fmt(totalMonth);
-  $('#totalIn').textContent = fmt(totalIn);
-  $('#totalOut').textContent = fmt(totalOut);
+        // --- 3. TEMA CLARO/ESCURO ---
 
-  const saldoCard = $('#saldoCard');
-  if(accounts.length>0){
-    saldoCard.style.display='block';
-    $('#saldo').textContent = fmt(totalIn - totalOut);
-  } else {
-    saldoCard.style.display='none';
-  }
+        function toggleTheme() {
+            const isDarkMode = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+            
+            // Atualiza o ícone
+            const icon = themeToggleBtn.querySelector('.material-icons');
+            icon.textContent = isDarkMode ? 'light_mode' : 'dark_mode';
+        }
+        
+        themeToggleBtn.addEventListener('click', toggleTheme);
+        
+        // Carrega o tema do localStorage
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark-mode');
+            themeToggleBtn.querySelector('.material-icons').textContent = 'light_mode';
+        }
 
-  // chart
-  const ctx = document.getElementById('chartArea');
-  const labels = ['Entradas','Saídas'];
-  const data = [totalIn,totalOut];
-  if(chart) chart.destroy();
-  chart = new Chart(ctx, {
-    type:'doughnut',
-    data:{ labels, datasets:[{ data, backgroundColor:['#10B981','#EF4444'] }] },
-    options:{ plugins:{ legend:{ labels:{ color:'#cbd5e1' } } } }
-  });
-}
 
-function renderUpcomingMini(){
-  const soon = getUpcoming(currentFilterDays).slice(0,6);
-  const container = $('#miniUpcoming'); container.innerHTML='';
-  if(soon.length===0){ container.innerHTML = '<div class="muted">Nenhum vencimento próximo</div>'; return; }
-  soon.forEach(a=>{
-    const div = document.createElement('div'); div.className='list-item';
-    div.innerHTML = `<div><div style="font-weight:600">${escapeHTML(a.nome)}</div><div class="muted small">${escapeHTML(getCategoryName(a.categoriaId || a.categoria))} — ${formatDate(a.vencimento)}</div></div>
-    <div style="text-align:right"><div class="chip ${a.tipo==='entrada'?'in':'out'}">${a.tipo}</div><div style="margin-top:8px"><button class="btn ghost payBtn" data-id="${a.id}">Marcar Pago</button></div></div>`;
-    container.appendChild(div);
-  });
-}
+        // --- 4. NAVEGAÇÃO ENTRE VISTAS ---
 
-function renderUpcomingList(days){
-  const list = getUpcoming(days);
-  const container = $('#upcomingList'); container.innerHTML='';
-  if(list.length===0){ container.innerHTML = '<div class="muted">Nenhum vencimento neste intervalo</div>'; return; }
-  list.forEach(a=>{
-    const el = document.createElement('div'); el.className='list-item';
-    el.innerHTML = `<div><div style="font-weight:600">${escapeHTML(a.nome)}</div><div class="muted small">${escapeHTML(getCategoryName(a.categoriaId || a.categoria))} — ${formatDate(a.vencimento)}</div></div>
-    <div class="actions"><span class="chip ${a.tipo==='entrada'?'in':'out'}">${a.tipo}</span><div style="margin-top:8px">
-      <button class="btn ghost editBtn" data-id="${a.id}">Editar</button>
-      <button class="btn ghost delBtn" data-id="${a.id}">Excluir</button>
-      <button class="btn primary payBtn" data-id="${a.id}">Marcar Pago</button>
-    </div></div>`;
-    container.appendChild(el);
-  });
-}
+        function switchView(viewId) {
+            viewDashboard.style.display = 'none';
+            viewCategories.style.display = 'none';
+            
+            document.getElementById(viewId).style.display = 'block';
+            
+            // Destaca o botão ativo (poderia ser melhorado com Tailwind)
+            navDashboard.classList.remove('btn-success');
+            navCategories.classList.remove('btn-success');
+            document.getElementById(`nav-${viewId.replace('view-', '')}`).classList.add('btn-success');
+        }
 
-function renderCategories(){
-  const sel = $('#categoria'); sel.innerHTML='';
-  categories.forEach(c=>{
-    const o = document.createElement('option');
-    o.value = c.id;       // usar id
-    o.textContent = c.categoria;
-    sel.appendChild(o);
-  });
-  const list = $('#categoriesList'); list.innerHTML='';
-  if(categories.length===0){ list.innerHTML = '<div class="muted">Sem categorias</div>'; return; }
-  categories.forEach(c=>{
-    const row = document.createElement('div'); row.className='list-item';
-    row.innerHTML = `<div>${escapeHTML(c.categoria)}</div><div><button class="btn ghost editCatBtn" data-id="${c.id}">Editar</button><button class="btn ghost delCatBtn" data-id="${c.id}">Excluir</button></div>`;
-    list.appendChild(row);
-  });
-}
+        navDashboard.addEventListener('click', () => switchView('view-dashboard'));
+        navCategories.addEventListener('click', () => switchView('view-categories'));
 
-function renderAllAccounts(){
-  const container = $('#allAccounts'); container.innerHTML='';
-  if(accounts.length===0){ container.innerHTML = '<div class="muted">Nenhuma conta cadastrada</div>'; return; }
-  const table = document.createElement('table'); table.className='table';
-  table.innerHTML = `<thead><tr><th>Nome</th><th>Categoria</th><th>Vencimento</th><th>Valor</th><th>Tipo</th><th>Status</th><th></th></tr></thead>`;
-  const tbody = document.createElement('tbody');
-  accounts.forEach(a=>{
-    const tr = document.createElement('tr');
-    const catName = escapeHTML(getCategoryName(a.categoriaId || a.categoria));
-    tr.innerHTML = `<td>${escapeHTML(a.nome)}</td>
-    <td>${catName}</td>
-    <td>${formatDate(a.vencimento)}</td>
-    <td>${fmt(a.valor)}</td>
-    <td><span class="chip ${a.tipo==='entrada'?'in':'out'}">${a.tipo}</span></td>
-    <td class="muted">${a.status||'pendente'}</td>
-    <td>
-      <button class="btn ghost editBtn" data-id="${a.id}">Editar</button>
-      <button class="btn ghost delBtn" data-id="${a.id}">Excluir</button>
-      <button class="btn primary payBtn" data-id="${a.id}">Marcar Pago</button>
-    </td>`;
-    tbody.appendChild(tr);
-  });
-  table.appendChild(tbody);
-  container.appendChild(table);
-}
 
-/* ==== FORM ==== */
-function setupForm(){
-  $('#status').addEventListener('change', ()=> {
-    $('#repeatBlock').style.display = $('#status').value === 'pendente' ? 'block' : 'none';
-  });
+        // --- 5. FUNÇÕES DE AUTENTICAÇÃO ---
 
-  $('#accountForm').addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const saveBtn = $('#saveBtn');
-    saveBtn.disabled = true;
-    const categoriaId = $('#categoria').value;
-    const categoriaNome = getCategoryName(categoriaId);
+        function updateUI(user) {
+            if (user) {
+                currentUserId = user.uid;
+                loginArea.style.display = 'none';
+                dashboardArea.style.display = 'block';
+                logoutBtn.style.display = 'block';
+                authError.textContent = ''; 
 
-    const data = {
-      action: $('#accountId').value ? 'editarConta' : 'cadastrarConta',
-      id: $('#accountId').value || undefined,
-      nome: $('#nome').value.trim(),
-      categoriaId: categoriaId,
-      categoriaNome: categoriaNome,
-      valor: Number($('#valor').value || 0),
-      vencimento: $('#vencimento').value,
-      tipo: $('#tipo').value,
-      status: $('#status').value,
-      repeticao: $('#repeticao').value
-    };
-    try{
-      showToast('Salvando...');
-      if(data.action === 'cadastrarConta'){
-        await apiPost(data);
-      } else {
-        await apiPut(data);
-      }
-      await loadAll();
-      openTab('dashboard');
-      showToast('Conta salva com sucesso!', 2500, 'success');
-    }catch(err){
-      showToast('Erro ao salvar: ' + (err.message||err), 4000, 'error');
-    } finally {
-      saveBtn.disabled = false;
-    }
-  });
+                // Ajusta as coleções com o ID do usuário
+                COLLECTION_ACCOUNTS = `artifacts/${appId}/users/${currentUserId}/contas`;
+                COLLECTION_CATEGORIES = `artifacts/${appId}/users/${currentUserId}/categorias`;
 
-  document.getElementById('cancelEdit').addEventListener('click', ()=> openTab('dashboard'));
-}
+                // Ativa os listeners de tempo real
+                setupRealtimeListeners(); 
+                switchView('view-dashboard'); // Inicia no Dashboard
+            } else {
+                if (accountsUnsubscribe) accountsUnsubscribe();
+                if (categoriesUnsubscribe) categoriesUnsubscribe();
+                
+                currentUserId = null;
+                loginArea.style.display = 'block';
+                dashboardArea.style.display = 'none';
+                logoutBtn.style.display = 'none';
+            }
+        }
+        
+        async function authenticateUser() {
+            if (initialAuthToken) {
+                try {
+                    // Tenta autenticar com o token personalizado
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } catch (error) {
+                    console.error("Erro ao autenticar com token:", error);
+                    // Em caso de erro, tenta autenticação anônima
+                    await signInAnonymously(auth);
+                }
+            } else {
+                // Se não houver token, autentica anonimamente
+                await signInAnonymously(auth);
+            }
+        }
+        authenticateUser(); // Tentativa de autenticação inicial
+        
+        onAuthStateChanged(auth, updateUI);
 
-/* ==== ACTIONS ==== */
-function bindUIButtons(){
-  document.getElementById('openNew').addEventListener('click', ()=> { openTab('new'); clearForm(); });
-  document.getElementById('refreshBtn').addEventListener('click', loadAll);
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            authError.textContent = '';
 
-  document.querySelectorAll('.filters button').forEach(b=>{
-    b.addEventListener('click', ()=> {
-      document.querySelectorAll('.filters button').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      currentFilterDays = Number(b.dataset.days);
-      renderUpcomingList(currentFilterDays);
-    });
-  });
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                showToast('Login realizado com sucesso!', 'success');
+            } catch (error) {
+                console.error("Erro ao logar:", error);
+                authError.textContent = 'Erro de Login: E-mail ou senha inválidos.';
+                showToast('Falha no Login. Verifique as credenciais.', 'error');
+            }
+        });
 
-  document.getElementById('addCat').addEventListener('click', async ()=>{
-    const name = prompt('Nome da categoria:');
-    if(!name) return;
-    try{
-      await apiPost({ action: 'cadastrarCategoria', categoria: name });
-      await loadAll();
-      showToast('Categoria criada', 2000, 'success');
-    }catch(err){ showToast('Erro: ' + (err.message||err), 3500, 'error'); }
-  });
+        signupBtn.addEventListener('click', async () => {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            authError.textContent = '';
+            
+            if (password.length < 6) {
+                authError.textContent = 'A senha deve ter pelo menos 6 caracteres.';
+                return;
+            }
 
-  // delegação para ações nas listas/tabela
-  document.getElementById('allAccounts').addEventListener('click', (e)=>{
-    const id = e.target.dataset?.id;
-    if(!id) return;
-    if(e.target.classList.contains('editBtn')) openEdit(id);
-    if(e.target.classList.contains('delBtn')) {
-      if(confirm('Deseja excluir esta conta?')) confirmDelete(id);
-    }
-    if(e.target.classList.contains('payBtn')) {
-      if(confirm('Marcar esta conta como PAGO?')) markPaid(id);
-    }
-  });
+            try {
+                await createUserWithEmailAndPassword(auth, email, password);
+                showToast('Conta criada com sucesso! Você está logado.', 'success');
+            } catch (error) {
+                console.error("Erro ao criar conta:", error);
+                authError.textContent = `Erro ao criar conta: ${error.message}`;
+                showToast(`Erro ao criar conta: ${error.message}`, 'error');
+            }
+        });
 
-  document.getElementById('miniUpcoming').addEventListener('click', (e)=>{
-    const id = e.target.dataset?.id;
-    if(!id) return;
-    if(e.target.classList.contains('payBtn')) {
-      if(confirm('Marcar esta conta como PAGO?')) markPaid(id);
-    }
-  });
+        logoutBtn.addEventListener('click', async () => {
+            await signOut(auth);
+            showToast('Sessão encerrada.', 'info');
+        });
 
-  document.getElementById('categoriesList').addEventListener('click', (e)=>{
-    const id = e.target.dataset?.id;
-    if(!id) return;
-    if(e.target.classList.contains('editCatBtn')) editCategory(id);
-    if(e.target.classList.contains('delCatBtn')) {
-      if(confirm('Excluir categoria?')) deleteCategory(id);
-    }
-  });
-}
+        // --- 6. LISTENERS DE TEMPO REAL (onSnapshot) ---
 
-async function markPaid(id){
-  try{
-    await apiPut({ action:'marcarPago', id });
-    await loadAll();
-    showToast('Pagamento registrado!', 2500, 'success');
-  }catch(err){ showToast('Erro: ' + (err.message||err), 3500, 'error'); }
-}
+        function setupRealtimeListeners() {
+            if (!currentUserId) return;
 
-async function openEdit(id){
-  const a = accounts.find(x=>String(x.id)===String(id));
-  if(!a) return showToast('Conta não encontrada', 2500, 'error');
-  openTab('new');
-  $('#accountId').value = a.id;
-  $('#nome').value = a.nome;
-  // preencher categoria (aceita categoriaId ou categoria)
-  $('#categoria').value = a.categoriaId || a.categoria || '';
-  $('#valor').value = a.valor;
-  const d = new Date(a.vencimento);
-  $('#vencimento').value = isNaN(d) ? a.vencimento : d.toISOString().slice(0,10);
-  $('#tipo').value = a.tipo || 'saida';
-  $('#status').value = a.status || 'pendente';
-  $('#repeticao').value = a.repeticao || 'nao';
-  $('#repeatBlock').style.display = $('#status').value==='pendente' ? 'block':'none';
-}
+            // 6.A Listener de Categorias
+            const categoriesQuery = query(collection(db, COLLECTION_CATEGORIES));
+            if (categoriesUnsubscribe) categoriesUnsubscribe(); // Remove listener anterior
+            categoriesUnsubscribe = onSnapshot(categoriesQuery, (snapshot) => {
+                const categories = [];
+                snapshot.forEach(doc => {
+                    categories.push({ id: doc.id, ...doc.data() });
+                });
+                renderCategorySelect(categories);
+                renderCategoryTable(categories);
+            }, (error) => {
+                console.error("Erro ao ouvir categorias:", error);
+                showToast('Erro ao carregar categorias.', 'error');
+            });
 
-async function confirmDelete(id){
-  try{
-    await apiDelete({ action:'deletarConta', id });
-    await loadAll();
-    showToast('Conta excluída', 2500, 'success');
-  }catch(err){ showToast('Erro: ' + (err.message||err), 3500, 'error'); }
-}
 
-/* ==== CATEGORIES ==== */
-function editCategory(id){
-  const c = categories.find(x=>String(x.id)===String(id));
-  if(!c) return showToast('Categoria não encontrada', 2500, 'error');
-  const name = prompt('Editar categoria', c.categoria);
-  if(!name) return;
-  apiPut({ action:'editarCategoria', id: c.id, categoria: name }).then(()=>loadAll()).catch(err=>showToast('Erro: ' + (err.message||err), 3500, 'error'));
-}
-function deleteCategory(id){
-  apiDelete({ action:'deletarCategoria', id }).then(()=>loadAll()).catch(err=>showToast('Erro: ' + (err.message||err), 3500, 'error'));
-}
+            // 6.B Listener de Contas (Lançamentos)
+            const accountsQuery = query(collection(db, COLLECTION_ACCOUNTS));
+            if (accountsUnsubscribe) accountsUnsubscribe(); // Remove listener anterior
+            accountsUnsubscribe = onSnapshot(accountsQuery, (snapshot) => {
+                allAccountsData = [];
+                snapshot.forEach(doc => {
+                    allAccountsData.push({ id: doc.id, ...doc.data() });
+                });
 
-/* ==== UTIL ==== */
-function getUpcoming(days){
-  const now = new Date(); now.setHours(0,0,0,0);
-  const end = new Date(now.getTime() + days * 86400000); // CORRIGIDO: 86400000 ms = 1 dia
-  return accounts.filter(a=>{
-    if(!a.vencimento) return false;
-    if(String(a.status).toLowerCase() === 'pago') return false;
-    const d = new Date(a.vencimento); d.setHours(0,0,0,0);
-    return d >= now && d <= end;
-  }).sort((x,y)=>new Date(x.vencimento)-new Date(y.vencimento));
-}
-function formatDate(d){ if(!d) return '-'; const dt = new Date(d); if(isNaN(dt)) return d; return dt.toLocaleDateString('pt-BR'); }
-function escapeHTML(str){ if(!str && str!==0) return ''; return String(str).replace(/[&<>"']/g, s=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[s]); }
-function clearForm(){ $('#accountId').value=''; $('#nome').value=''; $('#valor').value=''; $('#vencimento').value = todayISO(); $('#tipo').value='saida'; $('#status').value='pendente'; $('#repeticao').value='nao'; $('#repeatBlock').style.display='block'; }
+                // Atualiza todas as visões que dependem dos lançamentos
+                fetchAndRenderDashboardSummary(allAccountsData);
+                renderAccountsTable(allAccountsData);
+                fetchAndRenderChartData(allAccountsData);
+                
+                // Renderiza os vencimentos para o filtro padrão (7 dias)
+                renderUpcomingAccounts(7); 
+            }, (error) => {
+                console.error("Erro ao ouvir contas:", error);
+                showToast('Erro ao carregar lançamentos.', 'error');
+            });
+        }
 
-function showToast(msg, time=2500, type='info'){
-  const t = $('#toast');
-  t.className = 'toast';
-  if(type === 'success') t.classList.add('success');
-  if(type === 'error') t.classList.add('error');
-  t.style.display='block';
-  t.textContent=msg;
-  clearTimeout(t._to);
-  t._to = setTimeout(()=>t.style.display='none', time);
-}
-function hideToast(){ $('#toast').style.display='none' }
-</script>
 
+        // --- 7. CATEGORIAS (CRUD) ---
+
+        /** Renderiza as opções de categorias no SELECT do formulário de lançamento */
+        function renderCategorySelect(categories) {
+            const selectCategory = document.getElementById('account-category');
+            selectCategory.innerHTML = '<option value="">Selecione a Categoria</option>';
+            
+            if (categories.length === 0) {
+                selectCategory.innerHTML = '<option value="" disabled>Nenhuma categoria. Crie uma.</option>';
+                return;
+            }
+            
+            categories.forEach((cat) => {
+                const option = document.createElement('option');
+                option.value = cat.nome;
+                option.textContent = cat.nome;
+                selectCategory.appendChild(option);
+            });
+        }
+
+        /** Renderiza a tabela de categorias na visão de gestão */
+        function renderCategoryTable(categories) {
+            categoriesTableBody.innerHTML = '';
+            if (categories.length === 0) {
+                categoriesTableBody.innerHTML = '<tr><td colspan="2" style="text-align: center; color: var(--color-text-light);">Nenhuma categoria cadastrada.</td></tr>';
+                return;
+            }
+
+            categories.forEach(cat => {
+                const row = categoriesTableBody.insertRow();
+                row.innerHTML = `
+                    <td>${cat.nome}</td>
+                    <td>
+                        <button class="btn-secondary" onclick="editCategory('${cat.id}', '${cat.nome}')">Editar</button>
+                        <button class="btn-danger" onclick="deleteCategory('${cat.id}')">Excluir</button>
+                    </td>
+                `;
+            });
+        }
+        
+        /** Função para iniciar a edição de categoria (global para onclick) */
+        window.editCategory = (id, nome) => {
+            document.getElementById('category-doc-id').value = id;
+            document.getElementById('category-name').value = nome;
+            document.getElementById('save-category-btn').textContent = 'Atualizar Categoria';
+            document.getElementById('cancel-category-btn').style.display = 'inline-block';
+        };
+
+        /** Função para cancelar a edição de categoria */
+        document.getElementById('cancel-category-btn').addEventListener('click', () => {
+            newCategoryForm.reset();
+            document.getElementById('category-doc-id').value = '';
+            document.getElementById('save-category-btn').textContent = 'Salvar Categoria';
+            document.getElementById('cancel-category-btn').style.display = 'none';
+        });
+
+        /** Adicionar/Atualizar Categoria no Firestore */
+        newCategoryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUserId) return showToast("Erro: Usuário não autenticado.", 'error');
+
+            const id = document.getElementById('category-doc-id').value;
+            const nome = document.getElementById('category-name').value;
+            
+            const categoryData = { nome, userId: currentUserId };
+
+            try {
+                if (id) {
+                    // Edição
+                    await updateDoc(doc(db, COLLECTION_CATEGORIES, id), categoryData);
+                    showToast('Categoria atualizada com sucesso!', 'success');
+                } else {
+                    // Novo
+                    await addDoc(collection(db, COLLECTION_CATEGORIES), { ...categoryData, createdAt: new Date().toISOString() });
+                    showToast('Categoria salva com sucesso!', 'success');
+                }
+                newCategoryForm.reset();
+                document.getElementById('category-doc-id').value = '';
+                document.getElementById('save-category-btn').textContent = 'Salvar Categoria';
+                document.getElementById('cancel-category-btn').style.display = 'none';
+            } catch (e) {
+                console.error("Erro ao salvar categoria: ", e);
+                showToast('Erro ao salvar categoria. Verifique o console.', 'error');
+            }
+        });
+
+        /** Função para excluir categoria (global para onclick) */
+        window.deleteCategory = async (id) => {
+            if (!currentUserId) return showToast("Erro: Usuário não autenticado.", 'error');
+            if (!confirm('Tem certeza que deseja excluir esta categoria?')) return; // Confirmação simples
+
+            try {
+                await deleteDoc(doc(db, COLLECTION_CATEGORIES, id));
+                showToast('Categoria excluída com sucesso!', 'info');
+            } catch (e) {
+                console.error("Erro ao excluir categoria: ", e);
+                showToast('Erro ao excluir categoria.', 'error');
+            }
+        };
+
+
+        // --- 8. LANÇAMENTOS (CRUD) ---
+
+        /** Adicionar/Atualizar Lançamento no Firestore */
+        newAccountForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUserId) return showToast("Erro: Usuário não autenticado.", 'error');
+
+            const docId = document.getElementById('account-doc-id').value;
+            const valorFormatado = accountValueInput.value;
+
+            const data = {
+                nome: document.getElementById('account-name').value,
+                categoria: document.getElementById('account-category').value,
+                // Usar parseCurrency para garantir que o valor seja um número
+                valor: parseCurrency(valorFormatado), 
+                vencimento: document.getElementById('account-due-date').value,
+                tipo: document.querySelector('input[name="account-type"]:checked').value,
+                // Mantém o status ao editar, ou define como "pendente" para novo
+                status: docId ? allAccountsData.find(a => a.id === docId)?.status || "pendente" : "pendente", 
+                repeticao: "nao", // Simplificação
+            };
+
+            try {
+                if (docId) {
+                    // Edição
+                    await updateDoc(doc(db, COLLECTION_ACCOUNTS, docId), data);
+                    showToast('Lançamento atualizado com sucesso!', 'success');
+                } else {
+                    // Novo
+                    await addDoc(collection(db, COLLECTION_ACCOUNTS), {
+                        ...data,
+                        userId: currentUserId, 
+                        createdAt: new Date().toISOString() 
+                    });
+                    showToast('Lançamento salvo com sucesso!', 'success');
+                }
+                
+                // Resetar formulário e modo de edição
+                resetAccountForm();
+            } catch (e) {
+                console.error("Erro ao salvar lançamento: ", e);
+                showToast('Erro ao salvar lançamento. Verifique o console.', 'error');
+            }
+        });
+
+        function resetAccountForm() {
+            newAccountForm.reset();
+            document.getElementById('account-doc-id').value = '';
+            document.getElementById('save-account-btn').textContent = 'Salvar Lançamento';
+            document.getElementById('cancel-edit-btn').style.display = 'none';
+        }
+        
+        document.getElementById('cancel-edit-btn').addEventListener('click', resetAccountForm);
+
+        /** Função para iniciar a edição de um lançamento (global para onclick) */
+        window.editAccount = (id) => {
+            const account = allAccountsData.find(a => a.id === id);
+            if (!account) return showToast('Lançamento não encontrado.', 'error');
+            
+            document.getElementById('account-doc-id').value = account.id;
+            document.getElementById('account-name').value = account.nome;
+            document.getElementById('account-category').value = account.categoria;
+            // Define o valor já formatado
+            accountValueInput.value = formatCurrency(account.valor); 
+            document.getElementById('account-due-date').value = account.vencimento;
+            document.querySelector(`input[name="account-type"][value="${account.tipo}"]`).checked = true;
+
+            // Altera o botão para modo edição
+            document.getElementById('save-account-btn').textContent = 'Atualizar Lançamento';
+            document.getElementById('cancel-edit-btn').style.display = 'inline-block';
+            
+            // Rola para o formulário
+            document.getElementById('new-account-form').scrollIntoView({ behavior: 'smooth' });
+        };
+
+        /** Função para excluir um lançamento (global para onclick) */
+        window.deleteAccount = async (id) => {
+            if (!currentUserId) return showToast("Erro: Usuário não autenticado.", 'error');
+            if (!confirm('Tem certeza que deseja excluir este lançamento?')) return; 
+
+            try {
+                await deleteDoc(doc(db, COLLECTION_ACCOUNTS, id));
+                showToast('Lançamento excluído com sucesso!', 'info');
+            } catch (e) {
+                console.error("Erro ao excluir lançamento: ", e);
+                showToast('Erro ao excluir lançamento.', 'error');
+            }
+        };
+
+        /** Função para marcar um lançamento como pago (global para onclick) */
+        window.markAsPaid = async (id) => {
+            if (!currentUserId) return showToast("Erro: Usuário não autenticado.", 'error');
+            
+            try {
+                await updateDoc(doc(db, COLLECTION_ACCOUNTS, id), { status: 'pago' });
+                showToast('Conta marcada como paga/recebida!', 'success');
+            } catch (e) {
+                console.error("Erro ao atualizar status: ", e);
+                showToast('Erro ao marcar como pago/recebido.', 'error');
+            }
+        };
+
+        // --- 9. DASHBOARD E GRÁFICOS ---
+
+        /** Renderiza os cards de resumo (Saldo, Entradas, Saídas) */
+        function fetchAndRenderDashboardSummary(accounts) {
+            const summaryCards = document.getElementById('summary-cards');
+            let totalEntradas = 0;
+            let totalSaidas = 0;
+            let contasDoMes = 0;
+            let saldoFinal = 0;
+
+            // Apenas contas PAGAS e PENDENTES contribuem para o saldo
+            accounts.forEach((data) => {
+                contasDoMes++;
+                if (data.status === 'pago' || data.status === 'pendente') {
+                     if (data.tipo === 'entrada') {
+                        totalEntradas += data.valor;
+                    } else if (data.tipo === 'saida') {
+                        totalSaidas += data.valor;
+                    }
+                }
+            });
+
+            saldoFinal = totalEntradas - totalSaidas;
+            const saldoCor = saldoFinal >= 0 ? 'var(--color-success-green)' : 'var(--color-danger-red)';
+            
+            summaryCards.innerHTML = `
+                <div class="card" style="border-left: 5px solid var(--color-primary-blue);">
+                    <h3>Total de Lançamentos</h3>
+                    <p>Total: <strong>${contasDoMes}</strong></p>
+                </div>
+                <div class="card" style="border-left: 5px solid var(--color-success-green);">
+                    <h3>Total de Entradas (Previsto)</h3>
+                    <p><strong>${formatCurrency(totalEntradas)}</strong></p>
+                </div>
+                <div class="card" style="border-left: 5px solid var(--color-danger-red);">
+                    <h3>Total de Saídas (Previsto)</h3>
+                    <p><strong>${formatCurrency(totalSaidas)}</strong></p>
+                </div>
+                <div class="card" style="background-color: ${saldoCor}; color: white;">
+                    <h3>Saldo Atual (Previsto)</h3>
+                    <p style="font-size: 1.5rem;"><strong>${formatCurrency(saldoFinal)}</strong></p>
+                </div>
+            `;
+        }
+
+        /** Prepara os dados e renderiza o gráfico de evolução mensal */
+        function fetchAndRenderChartData(accounts) {
+            // Agrupa por mês/ano e calcula o total
+            const monthlyData = accounts.reduce((acc, account) => {
+                const date = new Date(account.vencimento);
+                const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                
+                if (!acc[monthYear]) {
+                    acc[monthYear] = { entradas: 0, saidas: 0, saldo: 0 };
+                }
+
+                if (account.tipo === 'entrada') {
+                    acc[monthYear].entradas += account.valor;
+                } else if (account.tipo === 'saida') {
+                    acc[monthYear].saidas += account.valor;
+                }
+
+                return acc;
+            }, {});
+            
+            // Calcula o saldo cumulativo e formata os labels
+            const sortedMonths = Object.keys(monthlyData).sort();
+            let cumulativeBalance = 0;
+
+            const labels = sortedMonths.map(my => {
+                const [year, month] = my.split('-');
+                return new Date(year, month - 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+            });
+            const entradasData = sortedMonths.map(my => monthlyData[my].entradas);
+            const saidasData = sortedMonths.map(my => monthlyData[my].saidas);
+            
+            // Calcula o saldo de cada mês e o saldo cumulativo
+            const saldoData = sortedMonths.map(my => {
+                const { entradas, saidas } = monthlyData[my];
+                cumulativeBalance += (entradas - saidas);
+                return cumulativeBalance; // Gráfico de saldo cumulativo
+            });
+
+            renderChart(labels, entradasData, saidasData, saldoData);
+        }
+
+        /** Renderiza o gráfico Chart.js */
+        function renderChart(labels, entradasData, saidasData, saldoData) {
+            if (myChart) {
+                myChart.destroy(); // Destrói a instância anterior, se existir
+            }
+            
+            const ctx = balanceChartCanvas.getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Entradas',
+                            data: entradasData,
+                            backgroundColor: 'rgba(16, 185, 129, 0.5)',
+                            borderColor: 'var(--color-success-green)',
+                            tension: 0.3,
+                            fill: false,
+                        },
+                        {
+                            label: 'Saídas',
+                            data: saidasData,
+                            backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                            borderColor: 'var(--color-danger-red)',
+                            tension: 0.3,
+                            fill: false,
+                        },
+                        {
+                            label: 'Saldo Cumulativo',
+                            data: saldoData,
+                            backgroundColor: 'rgba(79, 70, 229, 0.8)',
+                            borderColor: 'var(--color-primary-blue)',
+                            tension: 0.3,
+                            fill: true,
+                            yAxisID: 'y1', // Opcional, se quisermos duas escalas
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Entradas / Saídas (R$)'
+                            }
+                        },
+                        // Se quiser uma escala separada para o Saldo
+                        y1: {
+                            position: 'right',
+                            grid: {
+                                drawOnChartArea: false, // Só o eixo principal tem linhas de grade
+                            },
+                            title: {
+                                display: false,
+                                text: 'Saldo Cumulativo (R$)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += formatCurrency(context.parsed.y);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- 10. VENCIMENTOS E FILTROS ---
+
+        upcomingFilters.addEventListener('click', (e) => {
+            const days = e.target.getAttribute('data-days');
+            if (days) {
+                // Remove destaque dos botões
+                upcomingFilters.querySelectorAll('button').forEach(btn => btn.classList.remove('btn-success'));
+                // Adiciona destaque ao botão clicado
+                e.target.classList.add('btn-success');
+                renderUpcomingAccounts(parseInt(days, 10));
+            }
+        });
+
+        /** Renderiza a lista de contas com vencimento nos próximos X dias */
+        function renderUpcomingAccounts(days) {
+            const today = new Date();
+            const limitDate = new Date();
+            limitDate.setDate(today.getDate() + days);
+
+            const upcoming = allAccountsData.filter(account => {
+                // Apenas contas pendentes e com vencimento futuro
+                if (account.status !== 'pendente') return false; 
+                
+                const dueDate = new Date(account.vencimento + 'T00:00:00'); // Garante comparação correta
+                return dueDate >= today && dueDate <= limitDate;
+            }).sort((a, b) => new Date(a.vencimento) - new Date(b.vencimento));
+
+            upcomingAccountsList.innerHTML = '';
+
+            if (upcoming.length === 0) {
+                upcomingAccountsList.innerHTML = `<li style="color: var(--color-text-light);">Nenhum lançamento pendente nos próximos ${days} dias.</li>`;
+                return;
+            }
+
+            upcoming.forEach(account => {
+                const dueDate = new Date(account.vencimento + 'T00:00:00');
+                const diffTime = Math.abs(dueDate - today);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                
+                const li = document.createElement('li');
+                li.className = 'upcoming-item';
+                li.innerHTML = `
+                    <div class="${account.tipo === 'entrada' ? 'tipo-entrada' : 'tipo-saida'}">
+                        <strong>${account.nome}</strong> (${account.categoria})<br>
+                        ${formatCurrency(account.valor)} - Vence em ${diffDays} dias (${account.vencimento.split('-').reverse().join('/')})
+                    </div>
+                    <button class="btn-success" onclick="markAsPaid('${account.id}')">Pagar</button>
+                `;
+                upcomingAccountsList.appendChild(li);
+            });
+        }
+        
+        // --- 11. LISTA DE TODAS AS CONTAS (Tabela) ---
+        
+        function renderAccountsTable(accounts) {
+            accountsTableBody.innerHTML = '';
+
+            if (accounts.length === 0) {
+                accountsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--color-text-light);">Nenhum lançamento cadastrado.</td></tr>';
+                return;
+            }
+
+            accounts.sort((a, b) => new Date(b.vencimento) - new Date(a.vencimento)); // Mais recente primeiro
+
+            accounts.forEach(account => {
+                const row = accountsTableBody.insertRow();
+                row.innerHTML = `
+                    <td>${account.nome}</td>
+                    <td class="${account.tipo === 'entrada' ? 'tipo-entrada' : 'tipo-saida'}">${formatCurrency(account.valor)}</td>
+                    <td class="${account.tipo === 'entrada' ? 'tipo-entrada' : 'tipo-saida'}">${account.tipo.toUpperCase()}</td>
+                    <td class="status-${account.status}">${account.status.toUpperCase()}</td>
+                    <td>${account.vencimento.split('-').reverse().join('/')}</td>
+                    <td>
+                        <button class="btn-secondary" onclick="editAccount('${account.id}')">Editar</button>
+                        ${account.status === 'pendente' ? `<button class="btn-success" onclick="markAsPaid('${account.id}')">Pagar/Receber</button>` : ''}
+                        <button class="btn-danger" onclick="deleteAccount('${account.id}')">Excluir</button>
+                    </td>
+                `;
+            });
+        }
+    </script>
 </body>
 </html>
