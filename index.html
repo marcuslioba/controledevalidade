@@ -1,833 +1,597 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Checklist</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Contas a Pagar — Dashboard</title>
 
-  <!-- Tailwind + Icons -->
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Fonts & Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous"/>
 
-  <!-- React -->
-  <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <style>
-    :root { --laranja: #ff500a; }
-    body {
-    background: #f7f7f7;
-    min-height: 100vh;
-    font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, 'Helvetica Neue', Arial;
+    :root{
+      --bg:#0f1724;
+      --card:#0b1220;
+      --muted:#94a3b8;
+      --accent:#6c5ce7;
+      --green:#16a34a;
+      --red:#ef4444;
+      --glass: rgba(255,255,255,0.03);
+      --radius:14px;
+      font-family: 'Inter', system-ui, sans-serif;
     }
-    .title-font { font-family: 'Poppins','Inter',sans-serif; }
-    .btn-primary { background-color: var(--laranja); color: #fff; border: 2px solid transparent; transition: all .2s ease; }
-    .btn-primary:hover { background-color: #fff; color: var(--laranja); border-color: var(--laranja); }
-    .section-card { border-left: 6px solid var(--laranja); border-radius: 12px; background: #ffff; }
-    .section-title, .category-title { color: var(--laranja); font-family: 'Poppins','Inter',sans-serif; font-weight: 700; }
-    .accordion { border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background: #fff; }
-    .accordion-header { background: #fff7f3; border-bottom: 1px solid #fde7df; user-select: none; }
-    .accordion-header:hover { background: #fff2eb; }
-    .separator-dot { width: 6px; height: 6px; background: var(--laranja); border-radius: 9999px; display: inline-block; }
-    .drag-handle { cursor: grab; color: #9ca3af; }
-    .drag-handle:active { cursor: grabbing; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 700; }
-    .topbar { background: #ff500a; color: #fff; }
-    .topbar img { height: 44px; }
-    
-    @media print {
-      .topbar { background: #6b7280 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .title-font, .section-title, .category-title { color: #6b7280 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .accordion-header { background: #f3f4f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#071021 0%,#0b1220 100%);color:#e6eef8;min-height:100vh}
+    .app{display:grid;grid-template-columns:260px 1fr;gap:20px;padding:20px;max-width:1200px;margin:24px auto}
+
+    /* SIDEBAR */
+    .sidebar{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+    .brand{display:flex;gap:12px;align-items:center;margin-bottom:18px}
+    .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#34d399);display:flex;align-items:center;justify-content:center;font-weight:700;color:white}
+    .nav{display:flex;flex-direction:column;gap:6px}
+    .nav button{background:transparent;border:0;color:var(--muted);text-align:left;padding:10px;border-radius:10px;display:flex;gap:10px;align-items:center;cursor:pointer}
+    .nav button.active{background:linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));color:var(--accent)}
+
+    /* MAIN */
+    .main{padding:18px;border-radius:var(--radius);background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));box-shadow:0 6px 30px rgba(3,6,23,0.6)}
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+    h1{margin:0;font-size:18px}
+
+    /* grid cards */
+    .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+    .card{background:var(--glass);padding:14px;border-radius:12px;box-shadow:0 3px 12px rgba(2,6,23,0.4)}
+    .card .value{font-weight:700;font-size:18px}
+    .card small{color:var(--muted)}
+
+    /* mobile */
+    @media (max-width:900px){.app{grid-template-columns:1fr;padding:12px}.cards{grid-template-columns:repeat(2,1fr)}.sidebar{display:flex;overflow:auto;flex-direction:row;gap:10px;padding:10px}}
+
+    /* forms and lists */
+    form{display:grid;gap:8px}
+    input,select{padding:10px;border-radius:10px;border:0;background:rgba(255,255,255,0.03);color:inherit}
+    .btn{padding:10px 12px;border-radius:10px;border:0;cursor:pointer}
+    .btn.primary{background:linear-gradient(90deg,var(--accent),#8b5cf6);color:#fff}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+    .list{display:flex;flex-direction:column;gap:8px}
+    .list-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;background:rgba(255,255,255,0.02)}
+    .chip{padding:6px 8px;border-radius:999px;font-size:12px}
+    .chip.in{background:rgba(22,163,74,0.12);color:var(--green)}
+    .chip.out{background:rgba(239,68,68,0.08);color:var(--red)}
+    .muted{color:var(--muted);font-size:13px}
+    .small{font-size:13px}
+    .actions button{border:0;background:transparent;color:var(--muted);cursor:pointer}
+    .filters{display:flex;gap:8px;margin-bottom:8px}
+    .filters button{padding:6px 10px;border-radius:999px;border:0;background:rgba(255,255,255,0.02);cursor:pointer}
+    .toast{position:fixed;right:20px;bottom:20px;background:linear-gradient(90deg,#111827,#0b1220);padding:12px;border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,0.7);display:none}
+    .toast.success{border-left:4px solid var(--green)}
+    .toast.error{border-left:4px solid var(--red)}
+    .hidden{display:none}
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{padding:8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.02);font-size:14px}
   </style>
 </head>
 <body>
-  <!-- HEAD com logo -->
-  <header class="topbar w-full">
-    <div class="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
-    <div class="flex items-center gap-3">
-    <img src="logotipo_franchising.png" alt="Logo" />
-    <span class="title-font text-white font-bold text-xl hidden sm:block">Checklist</span>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">CA</div>
+      <div>
+        <div style="font-weight:700">ContasApp</div>
+        <div class="muted" style="font-size:12px">Financeiro simples</div>
+      </div>
     </div>
-    <div class="text-white text-xs sm:text-sm opacity-90">Auditorias e Checklists</div>
+
+    <nav class="nav" id="nav">
+      <button class="active" data-tab="dashboard"><span class="material-icons">dashboard</span> Dashboard</button>
+      <button data-tab="new"><span class="material-icons">add_circle</span> Cadastrar Conta</button>
+      <button data-tab="upcoming"><span class="material-icons">schedule</span> Próximos Vencimentos</button>
+      <button data-tab="categories"><span class="material-icons">category</span> Categorias</button>
+    </nav>
+
+    <div style="margin-top:18px" class="muted small">Dica: use filtros de 7/15/30 dias em Próximos Vencimentos.</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>Dashboard</h1>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn ghost" id="refreshBtn"><i class="fa fa-sync"></i> Atualizar</button>
+        <button class="btn primary" id="openNew">+ Nova Conta</button>
+      </div>
     </div>
-  </header>
 
-  <div id="root" class="mt-4"></div>
+    <section id="content">
+      <!-- DASHBOARD VIEW -->
+      <div id="dashboardView">
+        <div class="cards">
+          <div class="card">
+            <div class="muted">Total de contas (mês)</div>
+            <div class="value" id="totalMonth">R$ 0,00</div>
+          </div>
+          <div class="card">
+            <div class="muted">Total entradas</div>
+            <div class="value" id="totalIn">R$ 0,00</div>
+          </div>
+          <div class="card">
+            <div class="muted">Total saídas</div>
+            <div class="value" id="totalOut">R$ 0,00</div>
+          </div>
+          <div class="card" id="saldoCard" style="display:none">
+            <div class="muted">Saldo do mês</div>
+            <div class="value" id="saldo">R$ 0,00</div>
+          </div>
+        </div>
 
-  <script type="text/babel">
-    const { useState, useEffect, useMemo, useRef } = React;
+        <div style="display:grid;grid-template-columns:1fr 360px;gap:14px">
+          <div class="card">
+            <canvas id="chartArea" height="160"></canvas>
+          </div>
 
-    function App() {
-    // Estado base de perguntas
-    const [perguntas, setPerguntas] = useState([
-    { id: 1, categoria: 'Segurança', texto: 'EPIs conferidos?', fotoObrigatoria: true },
-    { id: 2, categoria: 'Segurança', texto: 'Extintores dentro da validade?', fotoObrigatoria: false },
-    { id: 3, categoria: 'Operação', texto: 'Equipamentos verificados?', fotoObrigatoria: false },
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div class="muted">Próximos Vencimentos</div>
+              <div class="small muted">7 / 15 / 30 dias</div>
+            </div>
+            <div id="miniUpcoming" class="list"></div>
+            <div style="margin-top:12px;text-align:right"><button class="btn ghost" data-tab="upcoming">Ver todos</button></div>
+          </div>
+        </div>
+
+        <div style="margin-top:14px" class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div><h3 class="small">Todas as Contas</h3><div class="muted">Lista completa de contas</div></div>
+          </div>
+
+          <div id="allAccounts"></div>
+        </div>
+      </div>
+
+      <!-- NEW ACCOUNT VIEW -->
+      <div id="newView" style="display:none">
+        <div class="card">
+          <h2 class="small">Cadastrar Conta</h2>
+          <form id="accountForm" aria-label="Formulário de conta">
+            <input type="hidden" id="accountId" />
+            <label for="nome">Nome</label>
+            <input id="nome" required aria-required="true" />
+            <label for="categoria">Categoria</label>
+            <select id="categoria" aria-required="true"></select>
+            <label for="valor">Valor</label>
+            <input id="valor" type="number" step="0.01" required inputmode="decimal" aria-required="true" />
+            <label for="vencimento">Vencimento</label>
+            <input id="vencimento" type="date" required />
+            <label for="tipo">Tipo</label>
+            <select id="tipo"><option value="saida">Saída</option><option value="entrada">Entrada</option></select>
+
+            <label for="status">Pagamento</label>
+            <select id="status" aria-describedby="statusHelp"><option value="pendente">Agendar Pagamento</option><option value="pago">Pago</option></select>
+            <div id="statusHelp" class="muted small">Escolha se já foi pago ou se deve ser agendado</div>
+
+            <div id="repeatBlock" style="display:none">
+              <label for="repeticao">Repetir mensalmente?</label>
+              <select id="repeticao"><option value="nao">Não</option><option value="sim">Sim</option></select>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button type="submit" class="btn primary" id="saveBtn">Salvar</button>
+              <button type="button" class="btn ghost" id="cancelEdit">Cancelar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- UPCOMING VIEW -->
+      <div id="upcomingView" style="display:none">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div>
+              <h3 class="small">Próximos Vencimentos</h3>
+              <div class="muted">Filtrar por intervalo</div>
+            </div>
+            <div class="filters">
+              <button data-days="7" class="active">7 dias</button>
+              <button data-days="15">15 dias</button>
+              <button data-days="30">30 dias</button>
+            </div>
+          </div>
+
+          <div id="upcomingList" class="list"></div>
+        </div>
+      </div>
+
+      <!-- CATEGORIES VIEW -->
+      <div id="categoriesView" style="display:none">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div><h3 class="small">Categorias</h3><div class="muted">Gerencie suas categorias</div></div>
+            <div><button id="addCat" class="btn primary">+ Categoria</button></div>
+          </div>
+
+          <div id="categoriesList" class="list"></div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ==== CONFIG ==== */
+/* sua URL final do Web App */
+const API = 'https://script.google.com/macros/s/AKfycbzcVyhC_ASf70QFf00rfGXyjFYo39kc12NRCNAQCXBAzRSSoR8cVHthBKc5Er4sz7Kt/exec';
+
+/* ==== HELPERS ==== */
+const $ = (s, p=document) => p.querySelector(s);
+const fmt = num => Number(num||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const todayISO = ()=> new Date().toISOString().slice(0,10);
+
+let accounts = [];
+let categories = [];
+let chart = null;
+let currentFilterDays = 7;
+
+/* Resolve nome da categoria com base em id ou nome recebido */
+function getCategoryName(ref){
+  if(!ref) return '';
+  // se for id, procurar na lista de categorias
+  const found = categories.find(c => String(c.id) === String(ref) || c.categoria === ref);
+  return found ? found.categoria : ref;
+}
+
+/* ==== BOOT ==== */
+document.addEventListener('DOMContentLoaded', () => {
+  initNav();
+  setupForm();
+  bindUIButtons();
+  loadAll();
+});
+
+/* NAV */
+function initNav(){
+  document.querySelectorAll('#nav button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#nav button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      openTab(b.dataset.tab);
+    });
+  });
+  // botões com data-tab (ex.: "Ver todos") também abrem
+  document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click', ()=>openTab(b.dataset.tab)));
+}
+function openTab(tab){
+  ['dashboard','new','upcoming','categories'].forEach(t=>{
+    const el = document.getElementById(t + 'View');
+    if(el) el.style.display = (t===tab ? 'block' : 'none');
+  });
+}
+
+/* ==== API HELPERS (JSON + status check) ==== */
+async function request(method='GET', url=API, body){
+  const opts = { method, headers:{} };
+  if(method !== 'GET'){
+    opts.headers['Content-Type'] = 'application/json;charset=utf-8';
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(url + (method==='GET' && body ? `?${body}` : ''), opts);
+  if(!res.ok){
+    const text = await res.text();
+    throw new Error(`HTTP ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+async function apiGet(params=''){ return request('GET', API, params); }
+async function apiPost(body){ return request('POST', API, body); }
+async function apiPut(body){ return request('PUT', API, body); }
+async function apiDelete(body){ return request('DELETE', API, body); }
+
+/* ==== LOAD & RENDER ==== */
+async function loadAll(){
+  showToast('Carregando dados...');
+  try{
+    const [contasResp, catsResp] = await Promise.all([
+      apiGet('action=listarContas'),
+      apiGet('action=listarCategorias')
     ]);
+    accounts = Array.isArray(contasResp) ? contasResp : (contasResp && contasResp.contas) ? contasResp.contas : [];
+    categories = Array.isArray(catsResp) ? catsResp : (catsResp && catsResp.categorias) ? catsResp.categorias : [];
+    renderDashboard();
+    renderCategories();
+    renderUpcomingMini();
+    renderAllAccounts();
+    hideToast();
+  }catch(err){
+    showToast('Erro ao carregar: ' + (err.message || err), 4000, 'error');
+  }
+}
 
-    // Ordem das categorias
-    const [categoriesOrder, setCategoriesOrder] = useState([]);
+function renderDashboard(){
+  const now = new Date();
+  const month = now.getMonth();
+  const year = now.getFullYear();
+  const monthAccounts = accounts.filter(a=>{
+    const d = new Date(a.vencimento);
+    return d.getMonth()===month && d.getFullYear()===year;
+  });
 
-    // Dados da auditoria (simples)
-    const [auditorNome, setAuditorNome] = useState('');
-    const [coords, setCoords] = useState(null);
-    const [endereco, setEndereco] = useState('');
-    const [geoStatus, setGeoStatus] = useState('idle'); // idle | buscando | ok | erro
-    const [geoErro, setGeoErro] = useState('');
+  const totalMonth = monthAccounts.reduce((s,a)=>s+Number(a.valor||0),0);
+  const totalIn = monthAccounts.filter(a=>a.tipo==='entrada').reduce((s,a)=>s+Number(a.valor||0),0);
+  const totalOut = monthAccounts.filter(a=>a.tipo==='saida').reduce((s,a)=>s+Number(a.valor||0),0);
 
-    // Execução do checklist
-    const [checklistIniciado, setChecklistIniciado] = useState(false);
-    const [checklistFinalizado, setChecklistFinalizado] = useState(false);
-    const [respostas, setRespostas] = useState({});
-    const [evidencias, setEvidencias] = useState({});
-    const [inicioISO, setInicioISO] = useState(null);
-    const [fimISO, setFimISO] = useState(null);
+  $('#totalMonth').textContent = fmt(totalMonth);
+  $('#totalIn').textContent = fmt(totalIn);
+  $('#totalOut').textContent = fmt(totalOut);
 
-    // UI gerenciamento
-    const [novaPergunta, setNovaPergunta] = useState('');
-    const [novaCategoria, setNovaCategoria] = useState('');
-    const [novaFotoObrigatoria, setNovaFotoObrigatoria] = useState(false);
-    const [editandoId, setEditandoId] = useState(null);
-    const [textoEdicao, setTextoEdicao] = useState('');
-    const [categoriaEdicao, setCategoriaEdicao] = useState('');
-    const [fotoObrigatoriaEdicao, setFotoObrigatoriaEdicao] = useState(false);
-    const [abertasInicial, setAbertasInicial] = useState({});
-    const [abertasExecucao, setAbertasExecucao] = useState({});
-    const [categoriaSendoEditada, setCategoriaSendoEditada] = useState(null);
-    const [novoNomeCategoria, setNovoNomeCategoria] = useState('');
-    const [uploadErro, setUploadErro] = useState('');
+  const saldoCard = $('#saldoCard');
+  if(accounts.length>0){
+    saldoCard.style.display='block';
+    $('#saldo').textContent = fmt(totalIn - totalOut);
+  } else {
+    saldoCard.style.display='none';
+  }
 
-    // Checklists salvos
-    const [nomeSet, setNomeSet] = useState('');
-    const [setsSalvos, setSetsSalvos] = useState([]);
-    const [setSelecionado, setSetSelecionado] = useState('');
+  // chart
+  const ctx = document.getElementById('chartArea');
+  const labels = ['Entradas','Saídas'];
+  const data = [totalIn,totalOut];
+  if(chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data, backgroundColor:['#10B981','#EF4444'] }] },
+    options:{ plugins:{ legend:{ labels:{ color:'#cbd5e1' } } } }
+  });
+}
 
-    // Dialog pós-importação
-    const [showSalvarDialog, setShowSalvarDialog] = useState(false);
-    const [nomeChecklistDialog, setNomeChecklistDialog] = useState('');
+function renderUpcomingMini(){
+  const soon = getUpcoming(currentFilterDays).slice(0,6);
+  const container = $('#miniUpcoming'); container.innerHTML='';
+  if(soon.length===0){ container.innerHTML = '<div class="muted">Nenhum vencimento próximo</div>'; return; }
+  soon.forEach(a=>{
+    const div = document.createElement('div'); div.className='list-item';
+    div.innerHTML = `<div><div style="font-weight:600">${escapeHTML(a.nome)}</div><div class="muted small">${escapeHTML(getCategoryName(a.categoriaId || a.categoria))} — ${formatDate(a.vencimento)}</div></div>
+    <div style="text-align:right"><div class="chip ${a.tipo==='entrada'?'in':'out'}">${a.tipo}</div><div style="margin-top:8px"><button class="btn ghost payBtn" data-id="${a.id}">Marcar Pago</button></div></div>`;
+    container.appendChild(div);
+  });
+}
 
-    // Utils
-    const normalizarTexto = (s) => (s || '').toString().replace(/\uFEFF/g, '').normalize('NFC').trim();
-    const parseBooleanLoose = (v) => ['sim','yes','true','1','y'].includes((v||'').toString().toLowerCase().trim());
+function renderUpcomingList(days){
+  const list = getUpcoming(days);
+  const container = $('#upcomingList'); container.innerHTML='';
+  if(list.length===0){ container.innerHTML = '<div class="muted">Nenhum vencimento neste intervalo</div>'; return; }
+  list.forEach(a=>{
+    const el = document.createElement('div'); el.className='list-item';
+    el.innerHTML = `<div><div style="font-weight:600">${escapeHTML(a.nome)}</div><div class="muted small">${escapeHTML(getCategoryName(a.categoriaId || a.categoria))} — ${formatDate(a.vencimento)}</div></div>
+    <div class="actions"><span class="chip ${a.tipo==='entrada'?'in':'out'}">${a.tipo}</span><div style="margin-top:8px">
+      <button class="btn ghost editBtn" data-id="${a.id}">Editar</button>
+      <button class="btn ghost delBtn" data-id="${a.id}">Excluir</button>
+      <button class="btn primary payBtn" data-id="${a.id}">Marcar Pago</button>
+    </div></div>`;
+    container.appendChild(el);
+  });
+}
 
-    // Agrupar por categoria
-    const groupsMap = useMemo(() => {
-    const m = new Map();
-    for (const p of perguntas) {
-    const cat = p.categoria || 'Geral';
-    if (!m.has(cat)) m.set(cat, []);
-    m.get(cat).push(p);
+function renderCategories(){
+  const sel = $('#categoria'); sel.innerHTML='';
+  categories.forEach(c=>{
+    const o = document.createElement('option');
+    o.value = c.id;       // usar id
+    o.textContent = c.categoria;
+    sel.appendChild(o);
+  });
+  const list = $('#categoriesList'); list.innerHTML='';
+  if(categories.length===0){ list.innerHTML = '<div class="muted">Sem categorias</div>'; return; }
+  categories.forEach(c=>{
+    const row = document.createElement('div'); row.className='list-item';
+    row.innerHTML = `<div>${escapeHTML(c.categoria)}</div><div><button class="btn ghost editCatBtn" data-id="${c.id}">Editar</button><button class="btn ghost delCatBtn" data-id="${c.id}">Excluir</button></div>`;
+    list.appendChild(row);
+  });
+}
+
+function renderAllAccounts(){
+  const container = $('#allAccounts'); container.innerHTML='';
+  if(accounts.length===0){ container.innerHTML = '<div class="muted">Nenhuma conta cadastrada</div>'; return; }
+  const table = document.createElement('table'); table.className='table';
+  table.innerHTML = `<thead><tr><th>Nome</th><th>Categoria</th><th>Vencimento</th><th>Valor</th><th>Tipo</th><th>Status</th><th></th></tr></thead>`;
+  const tbody = document.createElement('tbody');
+  accounts.forEach(a=>{
+    const tr = document.createElement('tr');
+    const catName = escapeHTML(getCategoryName(a.categoriaId || a.categoria));
+    tr.innerHTML = `<td>${escapeHTML(a.nome)}</td>
+    <td>${catName}</td>
+    <td>${formatDate(a.vencimento)}</td>
+    <td>${fmt(a.valor)}</td>
+    <td><span class="chip ${a.tipo==='entrada'?'in':'out'}">${a.tipo}</span></td>
+    <td class="muted">${a.status||'pendente'}</td>
+    <td>
+      <button class="btn ghost editBtn" data-id="${a.id}">Editar</button>
+      <button class="btn ghost delBtn" data-id="${a.id}">Excluir</button>
+      <button class="btn primary payBtn" data-id="${a.id}">Marcar Pago</button>
+    </td>`;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  container.appendChild(table);
+}
+
+/* ==== FORM ==== */
+function setupForm(){
+  $('#status').addEventListener('change', ()=> {
+    $('#repeatBlock').style.display = $('#status').value === 'pendente' ? 'block' : 'none';
+  });
+
+  $('#accountForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const saveBtn = $('#saveBtn');
+    saveBtn.disabled = true;
+    const categoriaId = $('#categoria').value;
+    const categoriaNome = getCategoryName(categoriaId);
+
+    const data = {
+      action: $('#accountId').value ? 'editarConta' : 'cadastrarConta',
+      id: $('#accountId').value || undefined,
+      nome: $('#nome').value.trim(),
+      categoriaId: categoriaId,
+      categoriaNome: categoriaNome,
+      valor: Number($('#valor').value || 0),
+      vencimento: $('#vencimento').value,
+      tipo: $('#tipo').value,
+      status: $('#status').value,
+      repeticao: $('#repeticao').value
+    };
+    try{
+      showToast('Salvando...');
+      if(data.action === 'cadastrarConta'){
+        await apiPost(data);
+      } else {
+        await apiPut(data);
+      }
+      await loadAll();
+      openTab('dashboard');
+      showToast('Conta salva com sucesso!', 2500, 'success');
+    }catch(err){
+      showToast('Erro ao salvar: ' + (err.message||err), 4000, 'error');
+    } finally {
+      saveBtn.disabled = false;
     }
-    return m;
-    }, [perguntas]);
-    const allCats = useMemo(() => Array.from(groupsMap.keys()), [groupsMap]);
+  });
 
-    // Sincroniza ordem de categorias
-    useEffect(() => {
-    setCategoriesOrder(prev => {
-    const s = new Set(prev);
-    const missing = allCats.filter(c => !s.has(c));
-    const filtered = prev.filter(c => groupsMap.has(c));
-    return [...filtered, ...missing];
+  document.getElementById('cancelEdit').addEventListener('click', ()=> openTab('dashboard'));
+}
+
+/* ==== ACTIONS ==== */
+function bindUIButtons(){
+  document.getElementById('openNew').addEventListener('click', ()=> { openTab('new'); clearForm(); });
+  document.getElementById('refreshBtn').addEventListener('click', loadAll);
+
+  document.querySelectorAll('.filters button').forEach(b=>{
+    b.addEventListener('click', ()=> {
+      document.querySelectorAll('.filters button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      currentFilterDays = Number(b.dataset.days);
+      renderUpcomingList(currentFilterDays);
     });
-    }, [allCats.join('|')]);
+  });
 
-    // Inicializa accordions
-    useEffect(() => {
-    const init = {}; for (const c of allCats) init[c] = false;
-    setAbertasInicial(prev => ({...init, ...prev}));
-    setAbertasExecucao(prev => ({...init, ...prev}));
-    }, [allCats.join('|')]);
+  document.getElementById('addCat').addEventListener('click', async ()=>{
+    const name = prompt('Nome da categoria:');
+    if(!name) return;
+    try{
+      await apiPost({ action: 'cadastrarCategoria', categoria: name });
+      await loadAll();
+      showToast('Categoria criada', 2000, 'success');
+    }catch(err){ showToast('Erro: ' + (err.message||err), 3500, 'error'); }
+  });
 
-    const proximoId = useMemo(() => (perguntas.length ? Math.max(...perguntas.map(p => p.id)) + 1 : 1), [perguntas]);
-
-    // CSV helpers
-    const detectarDelimitador = (text) => {
-    const bloco = text.split(/\r?\n/).slice(0, 5).join('\n');
-    const c1 = (bloco.match(/;/g) || []).length;
-    const c2 = (bloco.match(/,/g) || []).length;
-    const c3 = (bloco.match(/\t/g) || []).length;
-    if (c1 >= c2 && c1 >= c3) return ';';
-    if (c2 >= c1 && c2 >= c3) return ',';
-    return '\t';
-    };
-    const decodeWithFallback = async (file) => {
-    try { return await file.text(); }
-    catch {
-    const buf = await file.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    let out=''; for (let i=0;i<bytes.length;i++) out += String.fromCharCode(bytes[i]);
-    return out;
+  // delegação para ações nas listas/tabela
+  document.getElementById('allAccounts').addEventListener('click', (e)=>{
+    const id = e.target.dataset?.id;
+    if(!id) return;
+    if(e.target.classList.contains('editBtn')) openEdit(id);
+    if(e.target.classList.contains('delBtn')) {
+      if(confirm('Deseja excluir esta conta?')) confirmDelete(id);
     }
-    };
-    const parseCSVToPerguntas = (text) => {
-    const linhas = text.split(/\r?\n/).map(l => l.replace(/\uFEFF/g,'').trim()).filter(Boolean);
-    if (!linhas.length) return [];
-    const delim = detectarDelimitador(text);
-    const header = linhas[0].split(delim).map(c => c.trim().toLowerCase());
-    const hasHeader = ['categoria','pergunta','perguntas','foto_obrigatoria','foto obrigatoria','foto-obrigatoria','foto obrigatória','foto obrigatória?'].some(h => header.includes(h));
-    const out = [];
-    if (hasHeader) {
-    const idxCategoria = header.findIndex(h => h === 'categoria');
-    const idxPergunta = header.findIndex(h => ['pergunta','perguntas'].includes(h));
-    const idxFoto = header.findIndex(h => ['foto_obrigatoria','foto obrigatoria','foto-obrigatoria','foto obrigatória','foto obrigatória?'].includes(h));
-    for (let i=1;i<linhas.length;i++) {
-    const cols = linhas[i].split(delim).map(c => normalizarTexto(c));
-    const texto = idxPergunta >= 0 ? (cols[idxPergunta] || '') : '';
-    if (!texto) continue;
-    const categoria = idxCategoria >= 0 ? (cols[idxCategoria] || 'Geral') : 'Geral';
-    const fotoObrigatoria = idxFoto >= 0 ? parseBooleanLoose(cols[idxFoto] || 'nao') : false;
-    out.push({ categoria, texto, fotoObrigatoria });
+    if(e.target.classList.contains('payBtn')) {
+      if(confirm('Marcar esta conta como PAGO?')) markPaid(id);
     }
-    } else {
-    for (const l of linhas) out.push({ categoria: 'Geral', texto: normalizarTexto(l), fotoObrigatoria: false });
+  });
+
+  document.getElementById('miniUpcoming').addEventListener('click', (e)=>{
+    const id = e.target.dataset?.id;
+    if(!id) return;
+    if(e.target.classList.contains('payBtn')) {
+      if(confirm('Marcar esta conta como PAGO?')) markPaid(id);
     }
-    const uniq = []; const seen = new Set();
-    for (const p of out) { const key = (p.categoria + '__' + p.texto).toLowerCase(); if (!seen.has(key)) { seen.add(key); uniq.push(p); } }
-    return uniq;
-    };
+  });
 
-    // Checklists em localStorage
-    const LS_META_KEY = 'checklist_sets_meta';
-    const carregarMeta = () => { try { return JSON.parse(localStorage.getItem(LS_META_KEY) || '[]'); } catch { return []; } };
-    const salvarMeta = (m) => localStorage.setItem(LS_META_KEY, JSON.stringify(m));
-    const salvarChecklistLocal = (nome, lista) => {
-    if (!nome || !lista || !lista.length) return;
-    localStorage.setItem('checklist_set::' + nome, JSON.stringify(lista));
-    const meta = carregarMeta();
-    const idx = meta.findIndex(x => x.name === nome);
-    const item = { name: nome, count: lista.length, updatedAt: new Date().toISOString() };
-    if (idx >= 0) meta[idx] = item; else meta.push(item);
-    salvarMeta(meta);
-    setSetsSalvos(meta);
-    };
-    const carregarChecklistLocal = (nome) => { try { return JSON.parse(localStorage.getItem('checklist_set::' + nome) || 'null'); } catch { return null; } };
-    const excluirChecklistLocal = (nome) => {
-    localStorage.removeItem('checklist_set::' + nome);
-    const meta = carregarMeta().filter(m => m.name !== nome);
-    salvarMeta(meta);
-    setSetsSalvos(meta);
-    };
-    useEffect(() => { setSetsSalvos(carregarMeta()); }, []);
-
-    // Importar CSV -> abre diálogo para nomear e salvar
-    const [uploadErroLocal, setUploadErroLocal] = useState('');
-    const handleImportarChecklistCSV = async (file) => {
-    setUploadErro(''); setUploadErroLocal('');
-    if (!file) return;
-    if (!/\.csv$/i.test(file.name)) { setUploadErroLocal('Formato não suportado. Exporte como CSV (.csv).'); return; }
-    try {
-    const raw = await decodeWithFallback(file);
-    const dados = parseCSVToPerguntas(raw);
-    if (!dados.length) { setUploadErroLocal('Nenhuma pergunta válida encontrada no CSV.'); return; }
-    const novos = dados.map((d, i) => ({ id: i + 1, categoria: normalizarTexto(d.categoria || 'Geral'), texto: normalizarTexto(d.texto), fotoObrigatoria: !!d.fotoObrigatoria }));
-    setPerguntas(novos); setRespostas({}); setEvidencias({});
-    setNomeChecklistDialog(''); setShowSalvarDialog(true);
-    } catch (err) { setUploadErroLocal('Falha ao processar o CSV. ' + (err.message || '')); }
-    };
-
-    // Adicionar/editar/remover perguntas
-    const adicionarPergunta = () => {
-    if (!novaPergunta.trim()) return alert('Digite a pergunta.');
-    const cat = normalizarTexto(novaCategoria) || 'Geral';
-    setPerguntas(p => [...p, { id: proximoId, categoria: cat, texto: normalizarTexto(novaPergunta), fotoObrigatoria: !!novaFotoObrigatoria }]);
-    setNovaPergunta(''); setNovaCategoria(''); setNovaFotoObrigatoria(false);
-    };
-    const iniciarEdicao = (p) => { setEditandoId(p.id); setTextoEdicao(p.texto); setCategoriaEdicao(p.categoria); setFotoObrigatoriaEdicao(!!p.fotoObrigatoria); };
-    const salvarEdicao = () => {
-    if (editandoId == null) return;
-    setPerguntas(perguntas.map(p => p.id === editandoId ? ({ ...p, texto: normalizarTexto(textoEdicao) || p.texto, categoria: normalizarTexto(categoriaEdicao) || 'Geral', fotoObrigatoria: !!fotoObrigatoriaEdicao }) : p));
-    setEditandoId(null);
-    };
-    const removerPergunta = (id) => setPerguntas(perguntas.filter(p => p.id !== id));
-
-    // Categoria: editar/excluir/mover
-    const iniciarEdicaoCategoria = (cat) => { setCategoriaSendoEditada(cat); setNovoNomeCategoria(cat); };
-    const cancelarEdicaoCategoria = () => { setCategoriaSendoEditada(null); setNovoNomeCategoria(''); };
-    const salvarEdicaoCategoria = (catOriginal) => {
-    const novo = normalizarTexto(novoNomeCategoria) || 'Geral';
-    if (novo === catOriginal) { cancelarEdicaoCategoria(); return; }
-    setPerguntas(prev => prev.map(p => p.categoria === catOriginal ? { ...p, categoria: novo } : p));
-    setCategoriesOrder(prev => prev.map(c => c === catOriginal ? novo : c));
-    setAbertasInicial(prev => { const v = !!prev[catOriginal]; const copy = {...prev}; delete copy[catOriginal]; return {...copy, [novo]: v}; });
-    setAbertasExecucao(prev => { const v = !!prev[catOriginal]; const copy = {...prev}; delete copy[catOriginal]; return {...copy, [novo]: v}; });
-    cancelarEdicaoCategoria();
-    };
-    const excluirCategoria = (cat) => {
-    if (!confirm(`Excluir a categoria "${cat}" e todas as suas perguntas?`)) return;
-    setPerguntas(prev => prev.filter(p => p.categoria !== cat));
-    setCategoriesOrder(prev => prev.filter(c => c !== cat));
-    };
-    const moverCategoria = (cat, dir) => {
-    setCategoriesOrder(prev => {
-    const idx = prev.indexOf(cat);
-    if (idx < 0) return prev;
-    const novo = prev.slice();
-    if (dir === 'up' && idx > 0) [novo[idx-1], novo[idx]] = [novo[idx], novo[idx-1]];
-    if (dir === 'down' && idx < novo.length - 1) [novo[idx+1], novo[idx]] = [novo[idx], novo[idx+1]];
-    return novo;
-    });
-    };
-
-    // Accordions
-    const toggleInicial = (cat) => setAbertasInicial(prev => ({ ...prev, [cat]: !prev[cat] }));
-    const toggleExecucao = (cat) => setAbertasExecucao(prev => ({ ...prev, [cat]: !prev[cat] }));
-
-    // Drag & drop
-    const dragItemRef = useRef(null);
-    const onDragStartPergunta = (p) => (e) => { dragItemRef.current = { id: p.id }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(p.id)); };
-    const onDragOverPergunta = (p) => (e) => { e.preventDefault(); e.currentTarget?.classList.add('drag-over'); };
-    const onDragLeavePergunta = (e) => { e.currentTarget?.classList.remove('drag-over'); };
-    const onDropPergunta = (p) => (e) => {
-    e.preventDefault(); e.currentTarget?.classList.remove('drag-over');
-    const drag = dragItemRef.current; if (!drag || drag.id === p.id) return;
-    setPerguntas((list) => {
-    const fromIdx = list.findIndex(x => x.id === drag.id);
-    const toIdx = list.findIndex(x => x.id === p.id);
-    if (fromIdx < 0 || toIdx < 0) return list.slice();
-    const novo = list.slice();
-    const [moved] = novo.splice(fromIdx, 1);
-    const alvo = novo.find(x => x.id === p.id) || p;
-    moved.categoria = alvo.categoria;
-    const insertIndex = novo.findIndex(x => x.id === p.id);
-    novo.splice(insertIndex, 0, moved);
-    return novo;
-    });
-    dragItemRef.current = null;
-    };
-    const onDragOverCategoria = (cat) => (e) => { e.preventDefault(); e.currentTarget?.classList.add('drag-over'); };
-    const onDragLeaveCategoria = (e) => { e.currentTarget?.classList.remove('drag-over'); };
-    const onDropCategoria = (cat) => (e) => {
-    e.preventDefault(); e.currentTarget?.classList.remove('drag-over');
-    const drag = dragItemRef.current; if (!drag) return;
-    setPerguntas((list) => {
-    const fromIdx = list.findIndex(x => x.id === drag.id);
-    if (fromIdx < 0) return list.slice();
-    const novo = list.slice();
-    const [moved] = novo.splice(fromIdx, 1);
-    moved.categoria = cat;
-    let lastIdx = -1;
-    for (let i = novo.length - 1; i >= 0; i--) { if (novo[i].categoria === cat) { lastIdx = i; break; } }
-    if (lastIdx >= 0) novo.splice(lastIdx + 1, 0, moved); else novo.push(moved);
-    return novo;
-    });
-    dragItemRef.current = null;
-    };
-
-    // Check-in (GPS + reverse geocoding)
-    const fazerCheckin = () => {
-    setGeoErro('');
-    if (!('geolocation' in navigator)) { setGeoStatus('erro'); setGeoErro('Geolocalização não suportada.'); return; }
-    setGeoStatus('buscando');
-    navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-    const { latitude, longitude, accuracy } = pos.coords;
-    setCoords({ latitude, longitude, accuracy });
-    setGeoStatus('ok');
-    try {
-    const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`);
-    if (resp.ok) {
-    const data = await resp.json();
-    const addr = data.display_name || '';
-    setEndereco(addr);
-    } else {
-    setEndereco('');
+  document.getElementById('categoriesList').addEventListener('click', (e)=>{
+    const id = e.target.dataset?.id;
+    if(!id) return;
+    if(e.target.classList.contains('editCatBtn')) editCategory(id);
+    if(e.target.classList.contains('delCatBtn')) {
+      if(confirm('Excluir categoria?')) deleteCategory(id);
     }
-    } catch {
-    setEndereco('');
-    }
-    alert('Check-in realizado!');
-    },
-    (err) => { setGeoStatus('erro'); setGeoErro(err.message || 'Falha ao obter localização.'); },
-    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-    };
+  });
+}
 
-    // Requisitos para iniciar: auditor + check-in + perguntas
-    const requisitosAtendidosParaIniciar = () => {
-    if (!auditorNome.trim()) return false;
-    if (!coords) return false;
-    if (perguntas.length === 0) return false;
-    return true;
-    };
+async function markPaid(id){
+  try{
+    await apiPut({ action:'marcarPago', id });
+    await loadAll();
+    showToast('Pagamento registrado!', 2500, 'success');
+  }catch(err){ showToast('Erro: ' + (err.message||err), 3500, 'error'); }
+}
 
-    const iniciarChecklist = () => {
-    if (!requisitosAtendidosParaIniciar()) {
-    return alert('Para iniciar: informe o nome do auditor, faça o check-in (GPS) e tenha um checklist carregado.');
-    }
-    setChecklistIniciado(true);
-    setRespostas({});
-    setInicioISO(new Date().toISOString());
-    setFimISO(null);
-    };
+async function openEdit(id){
+  const a = accounts.find(x=>String(x.id)===String(id));
+  if(!a) return showToast('Conta não encontrada', 2500, 'error');
+  openTab('new');
+  $('#accountId').value = a.id;
+  $('#nome').value = a.nome;
+  // preencher categoria (aceita categoriaId ou categoria)
+  $('#categoria').value = a.categoriaId || a.categoria || '';
+  $('#valor').value = a.valor;
+  const d = new Date(a.vencimento);
+  $('#vencimento').value = isNaN(d) ? a.vencimento : d.toISOString().slice(0,10);
+  $('#tipo').value = a.tipo || 'saida';
+  $('#status').value = a.status || 'pendente';
+  $('#repeticao').value = a.repeticao || 'nao';
+  $('#repeatBlock').style.display = $('#status').value==='pendente' ? 'block':'none';
+}
 
-    const todasRespondidas = perguntas.every((p) => respostas[p.id]);
-    const evidenciasOk = perguntas.every((p) => p.fotoObrigatoria ? !!evidencias[p.id] : true);
+async function confirmDelete(id){
+  try{
+    await apiDelete({ action:'deletarConta', id });
+    await loadAll();
+    showToast('Conta excluída', 2500, 'success');
+  }catch(err){ showToast('Erro: ' + (err.message||err), 3500, 'error'); }
+}
 
-    const finalizarChecklist = () => {
-    if (!todasRespondidas) return alert('Responda todas as perguntas.');
-    if (!evidenciasOk) return alert('Há itens com foto obrigatória sem evidência.');
-    setFimISO(new Date().toISOString());
-    setChecklistFinalizado(true);
-    };
+/* ==== CATEGORIES ==== */
+function editCategory(id){
+  const c = categories.find(x=>String(x.id)===String(id));
+  if(!c) return showToast('Categoria não encontrada', 2500, 'error');
+  const name = prompt('Editar categoria', c.categoria);
+  if(!name) return;
+  apiPut({ action:'editarCategoria', id: c.id, categoria: name }).then(()=>loadAll()).catch(err=>showToast('Erro: ' + (err.message||err), 3500, 'error'));
+}
+function deleteCategory(id){
+  apiDelete({ action:'deletarCategoria', id }).then(()=>loadAll()).catch(err=>showToast('Erro: ' + (err.message||err), 3500, 'error'));
+}
 
-    const formatarDataHora = (iso) => (iso ? new Date(iso).toLocaleString('pt-BR') : '');
-    const duracaoHumana = (ms) => {
-    if (!ms || ms < 0) return '';
-    const s = Math.floor(ms/1000);
-    const h = Math.floor(s/3600);
-    const m = Math.floor((s%3600)/60);
-    const seg = s%60;
-    return [h? h+'h':null, (m||h)? m+'m':null, seg+'s'].filter(Boolean).join(' ');
-    };
-    const calcularNotaPct = () => {
-    const total = perguntas.length;
-    const pos = perguntas.filter(p => respostas[p.id] === 'sim').length;
-    const pct = total ? (pos/total)*100 : 0;
-    return pct.toFixed(2) + '%';
-    };
-    const reiniciar = () => {
-    setChecklistIniciado(false); setChecklistFinalizado(false); setRespostas({}); setEvidencias({});
-    setCoords(null); setEndereco(''); setGeoStatus('idle'); setGeoErro('');
-    setInicioISO(null); setFimISO(null);
-    };
+/* ==== UTIL ==== */
+function getUpcoming(days){
+  const now = new Date(); now.setHours(0,0,0,0);
+  const end = new Date(now.getTime() + days * 86400000); // CORRIGIDO: 86400000 ms = 1 dia
+  return accounts.filter(a=>{
+    if(!a.vencimento) return false;
+    if(String(a.status).toLowerCase() === 'pago') return false;
+    const d = new Date(a.vencimento); d.setHours(0,0,0,0);
+    return d >= now && d <= end;
+  }).sort((x,y)=>new Date(x.vencimento)-new Date(y.vencimento));
+}
+function formatDate(d){ if(!d) return '-'; const dt = new Date(d); if(isNaN(dt)) return d; return dt.toLocaleDateString('pt-BR'); }
+function escapeHTML(str){ if(!str && str!==0) return ''; return String(str).replace(/[&<>"']/g, s=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[s]); }
+function clearForm(){ $('#accountId').value=''; $('#nome').value=''; $('#valor').value=''; $('#vencimento').value = todayISO(); $('#tipo').value='saida'; $('#status').value='pendente'; $('#repeticao').value='nao'; $('#repeatBlock').style.display='block'; }
 
-    // Persistência
-    useEffect(() => {
-    setAuditorNome(localStorage.getItem('auditor_nome') || '');
-    try { const savedPerg = JSON.parse(localStorage.getItem('perguntas_lista') || 'null'); if (Array.isArray(savedPerg) && savedPerg.length) setPerguntas(savedPerg); } catch {}
-    try { const savedOrder = JSON.parse(localStorage.getItem('perguntas_categorias_ordem') || 'null'); if (Array.isArray(savedOrder)) setCategoriesOrder(savedOrder); } catch {}
-    try { const abIni = JSON.parse(localStorage.getItem('abertas_inicial') || 'null'); if (abIni && typeof abIni==='object') setAbertasInicial(abIni); } catch {}
-    try { const abExe = JSON.parse(localStorage.getItem('abertas_execucao') || 'null'); if (abExe && typeof abExe==='object') setAbertasExecucao(abExe); } catch {}
-    setSetsSalvos(carregarMeta());
-    }, []);
-    useEffect(() => { localStorage.setItem('perguntas_lista', JSON.stringify(perguntas)); }, [perguntas]);
-    useEffect(() => { localStorage.setItem('perguntas_categorias_ordem', JSON.stringify(categoriesOrder)); }, [categoriesOrder]);
-    useEffect(() => { localStorage.setItem('abertas_inicial', JSON.stringify(abertasInicial)); }, [abertasInicial]);
-    useEffect(() => { localStorage.setItem('abertas_execucao', JSON.stringify(abertasExecucao)); }, [abertasExecucao]);
+function showToast(msg, time=2500, type='info'){
+  const t = $('#toast');
+  t.className = 'toast';
+  if(type === 'success') t.classList.add('success');
+  if(type === 'error') t.classList.add('error');
+  t.style.display='block';
+  t.textContent=msg;
+  clearTimeout(t._to);
+  t._to = setTimeout(()=>t.style.display='none', time);
+}
+function hideToast(){ $('#toast').style.display='none' }
+</script>
 
-    // Dialog de salvar checklist após importação
-    const SalvarDialog = () => !showSalvarDialog ? null : (
-    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-    <div className="bg-white w-11/12 sm:w-[480px] rounded-lg shadow-xl p-5">
-    <h3 className="title-font text-xl font-bold mb-2" style={{color:'var(--laranja)'}}>Salvar checklist</h3>
-    <p className="text-sm text-gray-600 mb-3">Dê um nome para o checklist.</p>
-    <input type="text" value={nomeChecklistDialog} onChange={(e)=>setNomeChecklistDialog(e.target.value)} placeholder="Ex.: Checklist Loja A" className="w-full px-3 py-2 border rounded-lg mb-4"/>
-    <div className="flex justify-end gap-2">
-    <button onClick={()=>setShowSalvarDialog(false)} className="px-4 py-2 rounded-lg border">Cancelar</button>
-    <button onClick={()=>{
-    const nome = (nomeChecklistDialog || '').trim();
-    if (!nome) return alert('Informe um nome.');
-    salvarChecklistLocal(nome, perguntas);
-    setShowSalvarDialog(false);
-    alert('Checklist salvo!');
-    }} className="px-4 py-2 rounded-lg text-white" style={{background:'#16a34a'}}>Salvar</button>
-    </div>
-    </div>
-    </div>
-    );
-
-    // Telas
-    if (checklistFinalizado) {
-    const total = perguntas.length;
-    const pos = perguntas.filter(p => respostas[p.id] === 'sim').length;
-    const duracao = inicioISO && fimISO ? duracaoHumana(new Date(fimISO) - new Date(inicioISO)) : '';
-    const notaPct = calcularNotaPct();
-    const orderedCats = categoriesOrder.filter(c => groupsMap.has(c));
-    return (
-    <div className="min-h-screen p-4">
-    <SalvarDialog />
-    <div className="max-w-4xl mx-auto section-card shadow-2xl p-4 sm:p-8 bg-white">
-    <h1 className="title-font text-3xl font-bold text-center mb-6" style={{color: 'var(--laranja)'}}>
-    <i className="fas fa-file-alt mr-2"></i>Relatório do Checklist
-    </h1>
-    <div className="mb-6 bg-yellow-50 p-4 rounded-lg border border-yellow-100">
-    <h3 className="text-lg font-bold mb-2">Dados da Auditoria</h3>
-    <div className="text-sm text-gray-700 space-y-1">
-    <div><strong>Auditor:</strong> {auditorNome}</div>
-    {setSelecionado && <div><strong>Checklist:</strong> {setSelecionado}</div>}
-    {(endereco || coords) && (
-    <>
-    <div><strong>Endereço do check-in:</strong> {endereco ? endereco : `${coords?.latitude?.toFixed(6)}, ${coords?.longitude?.toFixed(6)}`}</div>
-    {coords?.accuracy && (<div><strong>Precisão:</strong> ±{Math.round(coords.accuracy)} m</div>)}
-    </>
-    )}
-    <div>
-    <strong>Início:</strong> {formatarDataHora(inicioISO)} | <strong>Fim:</strong> {formatarDataHora(fimISO)}
-    {inicioISO && fimISO && (<span> | <strong>Duração:</strong> {duracao}</span>)}
-    </div>
-    </div>
-    </div>
-
-    <div className="bg-white rounded-lg p-6 mb-6 text-center border">
-    <h2 className="title-font text-5xl font-bold mb-2" style={{color: 'var(--laranja)'}}>{notaPct}</h2>
-    <p className="text-sm sm:text-base text-gray-600">Nota Final — {pos} de {total} respostas positivas</p>
-    </div>
-    <div className="space-y-4 mb-6">
-    {orderedCats.map((cat) => {
-    const itens = groupsMap.get(cat) || [];
-    return (
-    <div key={cat} className="border rounded-lg">
-    <div className="px-3 py-2 bg-gray-100 font-semibold">{cat}</div>
-    <div className="p-3 space-y-2">
-    {itens.map((p) => (
-    <div key={p.id} className="p-3 bg-gray-50 rounded">
-    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-    <div className="flex-1">
-    <div className="text-sm font-semibold mb-1 break-words">{p.texto}</div>
-    <div className={'text-sm font-bold ' + (respostas[p.id] === 'sim' ? 'text-green-600' : 'text-red-600')}>
-    {respostas[p.id] === 'sim' ? '✓ SIM' : '✗ NÃO'}
-    </div>
-    {p.fotoObrigatoria && (<div className="mt-1 badge bg-yellow-100 text-yellow-700"><i className="fas fa-camera mr-1"></i>Foto obrigatória</div>)}
-    </div>
-    <div className="w-full sm:w-40 text-center">
-    {evidencias[p.id] ? (
-    <img src={evidencias[p.id]} alt={'Evidência ' + p.id} className="w-full sm:w-40 h-28 object-cover rounded border mx-auto" />
-    ) : (<div className="text-xs text-gray-500">Sem evidência</div>)}
-    </div>
-    </div>
-    </div>
-    ))}
-    </div>
-    </div>
-    );
-    })}
-    </div>
-    <div className="flex flex-col sm:flex-row gap-3">
-    <button onClick={() => window.print()} className="flex-1 btn-primary py-3 rounded-lg font-bold">
-    <i className="fas fa-print mr-2"></i>Imprimir / Salvar em PDF
-    </button>
-    <button onClick={reiniciar} className="flex-1 btn-primary py-3 rounded-lg font-bold">
-    <i className="fas fa-redo mr-2"></i>Novo Checklist
-    </button>
-    </div>
-    </div>
-    </div>
-    );
-    }
-
-    if (checklistIniciado) {
-    const orderedCats = categoriesOrder.filter(c => groupsMap.has(c));
-    return (
-    <div className="min-h-screen p-4">
-    <SalvarDialog />
-    <div className="max-w-4xl mx-auto section-card shadow-2xl p-4 sm:p-8">
-    <h1 className="title-font text-3xl font-bold text-center mb-6" style={{color: 'var(--laranja)'}}>
-    <i className="fas fa-clipboard-check mr-2"></i>Checklist
-    </h1>
-    <div className="mb-4 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
-    <h3 className="font-bold text-sm mb-2" style={{color: 'var(--laranja)'}}>
-    <i className="fas fa-user-check mr-2"></i>
-    Auditor: <span style={{color: 'var(--laranja)'}}>{auditorNome || '-'}</span>
-    </h3>
-    {setSelecionado && (
-    <div className="text-xs text-gray-700 mb-1">
-    <strong>Checklist:</strong> {setSelecionado}
-    </div>
-    )}
-    {(coords || endereco) && (
-    <div className="text-xs text-gray-700">
-    <strong>Check-in:</strong> {endereco ? endereco : `${coords?.latitude?.toFixed(6)}, ${coords?.longitude?.toFixed(6)}`} {coords?.accuracy && (<span>(±{Math.round(coords.accuracy)}m)</span>)}
-    </div>
-    )}
-    </div>
-
-    <div className="space-y-4 mb-6">
-    {orderedCats.map((cat) => {
-    const itens = groupsMap.get(cat) || [];
-    const total = itens.length;
-    const resp = itens.filter(p => !!respostas[p.id]).length;
-    const emAberto = total - resp;
-    return (
-    <div key={cat} className="accordion">
-    <div className="accordion-header px-4 py-3 flex items-center justify-between">
-    <div className="flex items-center gap-2 cursor-pointer" onClick={() => toggleExecucao(cat)}>
-    <i className={'fas ' + (abertasExecucao[cat] ? 'fa-chevron-up' : 'fa-chevron-down')} style={{color:'var(--laranja)'}}></i>
-    <span className="category-title">{cat}</span>
-    </div>
-    <div className="text-xs text-gray-600">
-    {emAberto > 0 ? `Ainda restam ${emAberto} perguntas em aberto` : 'Categoria concluída'}
-    </div>
-    </div>
-    {abertasExecucao[cat] && (
-    <div className="p-4 space-y-4">
-    {itens.map((p) => (
-    <div key={p.id} className="bg-gray-50 p-3 sm:p-4 rounded-lg border">
-    <p className="font-semibold mb-3 text-sm sm:text-base break-words">{p.texto}</p>
-    <div className="flex flex-col gap-3">
-    <div className="flex gap-3">
-    <button onClick={() => setRespostas(r => ({...r, [p.id]:'sim'}))} className={'flex-1 py-2 rounded-lg font-bold transition text-sm sm:text-base ' + (respostas[p.id] === 'sim' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-green-100')}><i className="fas fa-check mr-1 sm:mr-2"></i>SIM</button>
-    <button onClick={() => setRespostas(r => ({...r, [p.id]:'nao'}))} className={'flex-1 py-2 rounded-lg font-bold transition text-sm sm:text-base ' + (respostas[p.id] === 'nao' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-red-100')}><i className="fas fa-times mr-1 sm:mr-2"></i>NÃO</button>
-    </div>
-    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-    <label className="text-xs text-gray-600 whitespace-nowrap">Foto de evidência {p.fotoObrigatoria && <span className="text-yellow-700 font-semibold">(obrigatória)</span>}:</label>
-    <input type="file" accept="image/*" capture="environment" onChange={(e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setEvidencias((evs) => ({ ...evs, [p.id]: ev.target.result }));
-    reader.readAsDataURL(file);
-    }} className="text-xs w-full sm:w-auto" />
-    {evidencias[p.id] && <span className="text-green-600 text-xs whitespace-nowrap"><i className="fas fa-check mr-1"></i>Anexada</span>}
-    </div>
-    </div>
-    </div>
-    ))}
-    </div>
-    )}
-    </div>
-    );
-    })}
-    </div>
-
-    <button onClick={finalizarChecklist} disabled={!todasRespondidas || !evidenciasOk} className={'w-full py-3 rounded-lg font-bold transition text-sm sm:text-base ' + ((todasRespondidas && evidenciasOk) ? 'btn-primary' : 'bg-gray-300 text-gray-500 cursor-not-allowed')}>
-    <i className="fas fa-flag-checkered mr-2"></i>Finalizar e Gerar Relatório
-    </button>
-    </div>
-    </div>
-    );
-    }
-
-    // Tela inicial (SIMPLIFICADA): 1. Dados da Auditoria  2. Gerenciar Checklists
-    const orderedCats = categoriesOrder.filter(c => groupsMap.has(c));
-
-    return (
-    <div className="min-h-screen p-4">
-    <div className="max-w-6xl mx-auto section-card shadow-2xl p-4 sm:p-8">
-    <SalvarDialog />
-    <h1 className="title-font text-4xl font-bold text-center mb-8" style={{color: 'var(--laranja)'}}>
-    <i className="fas fa-tasks mr-3"></i>Checklist
-    </h1>
-
-    {/* 1. Dados da Auditoria */}
-    <div className="mb-8 bg-white p-4 sm:p-6 rounded-lg border">
-    <h2 className="section-title text-2xl mb-4"><i className="fas fa-clipboard-user mr-2"></i>1. Dados da Auditoria</h2>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-    <div className="md:col-span-1">
-    <label className="block text-sm font-semibold mb-2 text-gray-700">Nome do auditor</label>
-    <input type="text" value={auditorNome} onChange={(e) => setAuditorNome(e.target.value)} onBlur={(e) => localStorage.setItem('auditor_nome', e.target.value)} placeholder="Seu nome completo" className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 text-sm sm:text-base focus:ring-yellow-400" />
-    </div>
-    <div className="md:col-span-1">
-    <label className="block text-sm font-semibold mb-2 text-gray-700">Selecionar checklist</label>
-    <div className="flex gap-2">
-    <select value={setSelecionado} onChange={(e)=>setSetSelecionado(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 text-sm">
-    <option value="">Selecione</option>
-    {setsSalvos.map(s => (<option key={s.name} value={s.name}>{s.name} ({s.count})</option>))}
-    </select>
-    <button onClick={()=>{
-    if (!setSelecionado) return alert('Selecione um checklist.');
-    const dados = carregarChecklistLocal(setSelecionado);
-    if (!dados || !Array.isArray(dados) || !dados.length) return alert('Checklist vazio ou inválido.');
-    const novos = dados.map((d, i)=>({ id: i+1, categoria: normalizarTexto(d.categoria||'Geral'), texto: normalizarTexto(d.texto||''), fotoObrigatoria: !!d.fotoObrigatoria }));
-    setPerguntas(novos); setRespostas({}); setEvidencias({}); alert('Checklist carregado!');
-    }} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-sm">Carregar</button>
-    <button
-    onClick={()=>{
-    if (!setSelecionado) return alert('Selecione um checklist.');
-    const dados = carregarChecklistLocal(setSelecionado);
-    if (!dados || !Array.isArray(dados) || !dados.length) return alert('Checklist vazio ou inválido.');
-    const header = 'categoria;pergunta;foto_obrigatoria';
-    const linhas = dados.map(p=>{
-    const cat = (p.categoria||'').replace(/;/g, ',');
-    const txt = (p.texto||'').replace(/;/g, ',');
-    const foto = p.fotoObrigatoria ? 'sim' : 'nao';
-    return `${cat};${txt};${foto}`;
-    });
-    const csv = [header, ...linhas].join('\n');
-    const blob = new Blob(["\uFEFF"+csv], {type:'text/csv;charset=utf-8;'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `checklist_${setSelecionado}.csv`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-    }}
-    className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg font-bold text-sm"
-    title="Baixar checklist selecionado"
-    >
-    <i className="fas fa-download"></i>
-    </button>
-    <button onClick={()=>{
-    if (!setSelecionado) return alert('Selecione um checklist.');
-    if (confirm('Excluir o checklist "'+setSelecionado+'"?')) excluirChecklistLocal(setSelecionado);
-    }} className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg font-bold text-sm" title="Excluir checklist"><i className="fas fa-trash"></i></button>
-    </div>
-    </div>
-    <div className="md:col-span-1">
-    <button onClick={fazerCheckin} className="w-full btn-primary px-4 py-3 rounded-lg font-bold text-base">
-    <i className="fas fa-location-arrow mr-2"></i>Fazer check-in (GPS)
-    </button>
-    <div className="mt-2 text-xs text-gray-600">
-    {geoStatus === 'buscando' && 'Buscando localização…'}
-    {geoErro && <span className="text-red-600">{geoErro}</span>}
-    {coords && !geoErro && (
-    <div className="space-y-1">
-    <div>OK: {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)} (±{Math.round(coords.accuracy||0)}m)</div>
-    {endereco && <div className="text-gray-700">Endereço: {endereco}</div>}
-    </div>
-    )}
-    </div>
-    </div>
-    </div>
-    </div>
-
-    {/* 2. Gerenciar checklists */}
-    <div className="mb-8 bg-white p-4 sm:p-6 rounded-lg border">
-    <h2 className="section-title text-2xl mb-4"><i className="fas fa-cog mr-2"></i>2. Gerenciar checklists</h2>
-
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-    <div className="p-3 border rounded-lg">
-    <div className="font-semibold mb-2 flex items-center gap-2">
-    <i className="fas fa-file-import text-blue-600"></i>
-    <span>Importar checklist (CSV)</span>
-    </div>
-    <input id="inputCsv" type="file" accept=".csv" onChange={(e)=>handleImportarChecklistCSV(e.target.files[0])} className="hidden"/>
-    <button onClick={()=>document.getElementById('inputCsv').click()} className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-sm">
-    <i className="fas fa-upload mr-2"></i>Importar CSV
-    </button>
-    {uploadErroLocal && (<div className="bg-red-50 text-red-700 p-2 rounded mt-2 text-xs">{uploadErroLocal}</div>)}
-    <div className="text-xs text-gray-600 mt-2">
-    Este upload substitui a lista atual de perguntas.
-    </div>
-
-    <div className="border-t my-3"></div>
-
-    <div className="font-semibold mb-2 flex items-center gap-2">
-    <i className="fas fa-folder-plus text-green-600"></i>
-    <span>Salvar perguntas atuais como um novo checklist</span>
-    </div>
-    <div className="flex items-stretch gap-2 mb-2">
-    <input type="text" value={nomeSet} onChange={(e)=>setNomeSet(e.target.value)} placeholder="Nome do checklist (ex.: Checklist Loja A)" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 text-sm" />
-    <button onClick={()=>{ if (!nomeSet.trim()) return alert('Informe um nome.'); salvarChecklistLocal(nomeSet.trim(), perguntas); alert('Checklist salvo!'); }} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm">Salvar</button>
-    </div>
-    </div>
-
-    <div className="p-3 border rounded-lg">
-    <div className="font-semibold mb-2 flex items-center gap-2">
-    <i className="fas fa-keyboard"></i>
-    <span>Adicionar perguntas manualmente</span>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
-    <input type="text" value={novaCategoria} onChange={(e) => setNovaCategoria(e.target.value)} placeholder="Categoria (ex.: Segurança)" className="md:col-span-3 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 text-sm sm:text-base focus:ring-yellow-400" />
-    <input type="text" value={novaPergunta} onChange={(e) => setNovaPergunta(e.target.value)} onKeyPress={(e) => { if (e.key === 'Enter') adicionarPergunta(); }} placeholder="Digite uma nova pergunta..." className="md:col-span-7 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 text-sm sm:text-base focus:ring-yellow-400" />
-    <button onClick={adicionarPergunta} className="md:col-span-1 btn-primary px-3 py-2 rounded-lg font-bold text-sm sm:text-base">
-    <i className="fas fa-plus mr-1"></i>Adicionar
-    </button>
-    <label className="md:col-span-1 flex items-center gap-2 px-2 text-sm"><input type="checkbox" checked={novaFotoObrigatoria} onChange={(e) => setNovaFotoObrigatoria(e.target.checked)} />Foto obrigatória</label>
-    </div>
-    </div>
-    </div>
-
-    <div className="flex items-center justify-between mb-2">
-    <div className="font-semibold">
-    <i className="fas fa-list mr-2"></i>Perguntas do checklist atual
-    </div>
-    <button
-    onClick={()=>{
-    setNomeChecklistDialog('');
-    setShowSalvarDialog(true);
-    }}
-    className="underline text-sm text-orange-600 hover:text-orange-700"
-    >
-    Salvar checklist
-    </button>
-    </div>
-
-    {/* Lista de perguntas por categoria (ícone de dropdown à esquerda) */}
-    <div className="space-y-4">
-    {orderedCats.map((cat, index) => {
-    const itens = groupsMap.get(cat) || [];
-    return (
-    <div key={cat} className="accordion">
-    <div className="accordion-header px-4 py-3">
-    <div className="flex items-center justify-between">
-    <div className="flex items-center gap-2">
-    <button className="px-2 py-1" onClick={()=>toggleInicial(cat)} title="Expandir/Recolher">
-    <i className={'fas ' + (abertasInicial[cat] ? 'fa-chevron-up' : 'fa-chevron-down')} style={{color:'var(--laranja)'}}></i>
-    </button>
-    {categoriaSendoEditada === cat ? (
-    <div className="flex items-center gap-2" onClick={(e)=>e.stopPropagation()}>
-    <input value={novoNomeCategoria} onChange={(e)=>setNovoNomeCategoria(e.target.value)} className="px-2 py-1 border rounded text-sm" />
-    <button className="text-green-700 font-semibold text-sm" onClick={()=>salvarEdicaoCategoria(cat)}><i className="fas fa-check mr-1"></i>Salvar</button>
-    <button className="text-gray-600 text-sm" onClick={cancelarEdicaoCategoria}><i className="fas fa-times mr-1"></i>Cancelar</button>
-    </div>
-    ) : (
-    <>
-    <span className="separator-dot"></span>
-    <span className="category-title">{cat}</span>
-    </>
-    )}
-    </div>
-    <div className="flex items-center gap-2">
-    {categoriaSendoEditada !== cat && (
-    <>
-    <button className="text-gray-600 hover:text-gray-800 px-2 py-1 text-sm" title="Mover para cima" disabled={index===0} onClick={()=>moverCategoria(cat,'up')}>
-    <i className="fas fa-arrow-up"></i>
-    </button>
-    <button className="text-gray-600 hover:text-gray-800 px-2 py-1 text-sm" title="Mover para baixo" disabled={index===orderedCats.length-1} onClick={()=>moverCategoria(cat,'down')}>
-    <i className="fas fa-arrow-down"></i>
-    </button>
-    <button className="text-orange-600 hover:text-orange-700 px-2 py-1 text-sm font-semibold" title="Editar categoria" onClick={()=>iniciarEdicaoCategoria(cat)}>
-    <i className="fas fa-pen mr-1"></i>Editar
-    </button>
-    <button className="text-red-600 hover:text-red-700 px-2 py-1 text-sm font-semibold" title="Excluir categoria" onClick={()=>excluirCategoria(cat)}>
-    <i className="fas fa-trash mr-1"></i>Excluir
-    </button>
-    </>
-    )}
-    </div>
-    </div>
-    </div>
-
-    {abertasInicial[cat] && (
-    <div className="p-3 sm:p-4" onDragOver={onDragOverCategoria(cat)} onDrop={onDropCategoria(cat)} onDragLeave={onDragLeaveCategoria}>
-    <div className="space-y-2">
-    {itens.map((p) => (
-    <div key={p.id} className="flex items-center gap-2 bg-white p-3 rounded-lg shadow border" draggable onDragStart={onDragStartPergunta(p)} onDragOver={onDragOverPergunta(p)} onDragLeave={onDragLeavePergunta} onDrop={onDropPergunta(p)}>
-    <i className="fas fa-grip-vertical drag-handle"></i>
-    {editandoId === p.id ? (
-    <>
-    <input type="text" value={categoriaEdicao} onChange={(e) => setCategoriaEdicao(e.target.value)} placeholder="Categoria" className="w-40 px-2 sm:px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 text-sm sm:text-base focus:ring-yellow-400" />
-    <input type="text" value={textoEdicao} onChange={(e) => setTextoEdicao(e.target.value)} className="flex-1 px-2 sm:px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 text-sm sm:text-base focus:ring-yellow-400" />
-    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={fotoObrigatoriaEdicao} onChange={(e) => setFotoObrigatoriaEdicao(e.target.checked)} />Foto obrigatória</label>
-    <button onClick={salvarEdicao} className="bg-green-500 text-white px-2 sm:px-3 py-1 rounded hover:bg-green-600 text-sm sm:text-base" title="Salvar"><i className="fas fa-check"></i></button>
-    <button onClick={() => setEditandoId(null)} className="bg-gray-500 text-white px-2 sm:px-3 py-1 rounded hover:bg-gray-600 text-sm sm:text-base" title="Cancelar"><i className="fas fa-times"></i></button>
-    </>
-    ) : (
-    <>
-    <span className="badge bg-gray-100 text-gray-700">{p.categoria || 'Geral'}</span>
-    <span className="flex-1 text-sm sm:text-base break-words">{p.texto}</span>
-    {p.fotoObrigatoria && <span className="badge bg-yellow-100 text-yellow-700"><i className="fas fa-camera mr-1"></i>Foto obrigatória</span>}
-    <button onClick={() => iniciarEdicao(p)} className="px-2 text-orange-600 hover:text-orange-700" title="Editar pergunta"><i className="fas fa-edit"></i></button>
-    <button onClick={() => removerPergunta(p.id)} className="text-red-500 hover:text-red-700 px-2" title="Excluir pergunta"><i className="fas fa-trash"></i></button>
-    </>
-    )}
-    </div>
-    ))}
-    </div>
-    </div>
-    )}
-    </div>
-    );
-    })}
-    </div>
-    </div>
-
-    <button onClick={iniciarChecklist} disabled={!requisitosAtendidosParaIniciar()} className={'w-full py-4 rounded-lg font-bold text-lg transition mt-2 ' + (requisitosAtendidosParaIniciar() ? 'btn-primary' : 'bg-gray-300 text-gray-500 cursor-not-allowed')}>
-    <i className="fas fa-play-circle mr-2"></i>Iniciar Checklist
-    </button>
-    </div>
-    </div>
-    );
-    }
-
-    ReactDOM.render(<App />, document.getElementById('root'));
-  </script>
 </body>
 </html>
