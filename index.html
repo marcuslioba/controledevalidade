@@ -11,25 +11,38 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // ATUALIZAÇÃO: Importadas funções de login, cadastro, logout e onAuthStateChanged
+        // Imports para Autenticação E-mail/Senha
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // Imports para Firestore (Banco de Dados)
         import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Imports para Storage (Arquivos/Documentos)
         import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         
-        // Configurações e Variáveis Globais (Fornecidas pelo ambiente Canvas)
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { /* Mock config */ };
+        // --- CONFIGURAÇÃO FIREBASE (CORRIGIDA) ---
+        // Agora, o código usa diretamente a sua configuração fornecida.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Mantido para compatibilidade
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // ** SUA CONFIGURAÇÃO FIREBASE INSERIDA AQUI **
+        const firebaseConfig = {
+            apiKey: "AIzaSyDTjGnO9D4fljHA0ucTBujw_n1PSAFatkE",
+            authDomain: "studio-873001119-21845.firebaseapp.com",
+            projectId: "studio-873001119-21845",
+            storageBucket: "studio-873001119-21845.firebasestorage.app",
+            messagingSenderId: "842279750292",
+            appId: "1:842279750292:web:62583e78f06ca68a6e0281"
+        };
+        // ------------------------------------------
 
         let app, db, auth, storage, userId;
         const state = {
-            currentView: 'dashboard', // dashboard, patients, agenda, finance, documents
+            currentView: 'dashboard',
             patients: [],
             appointments: [],
             finances: [],
-            activePatient: null, // Patient object for detail view
+            activePatient: null,
             isAuthReady: false,
-            isRegisterMode: false // Novo estado para alternar entre login/cadastro
+            isRegisterMode: false 
         };
 
         // --- UTILS ---
@@ -88,18 +101,14 @@
         const initializeFirebase = async () => {
             showLoading('Inicializando o sistema...');
             try {
-                if (Object.keys(firebaseConfig).length === 0) {
-                    console.error("Firebase Config not available. Using mock initialization.");
-                    app = initializeApp({});
-                } else {
-                    app = initializeApp(firebaseConfig);
-                }
+                // ** CORREÇÃO APLICADA: Inicializa com a configuração fornecida **
+                app = initializeApp(firebaseConfig);
                 
                 db = getFirestore(app);
                 auth = getAuth(app);
                 storage = getStorage(app);
 
-                // ATUALIZAÇÃO: Monitora o estado de autenticação (user)
+                // Monitora o estado de autenticação (user)
                 onAuthStateChanged(auth, (user) => {
                     state.isAuthReady = true;
                     
@@ -130,17 +139,18 @@
 
             } catch (error) {
                 console.error("Erro ao inicializar Firebase ou Autenticar:", error);
+                // Exibe uma mensagem mais clara em caso de erro de configuração/conexão
+                showMessage('Erro crítico: Falha ao conectar ao Firebase. Verifique sua configuração.', 'error', 10000);
                 hideLoading();
             }
         };
 
-        // --- HANDLERS DE AUTENTICAÇÃO (NOVOS) ---
+        // --- HANDLERS DE AUTENTICAÇÃO ---
         
         const handleLogin = async (email, password) => {
             showLoading('Entrando...');
             try {
                 await signInWithEmailAndPassword(auth, email, password);
-                // onAuthStateChanged cuidará de iniciar o app após o login
                 showMessage('Login realizado com sucesso!', 'success');
             } catch (error) {
                 console.error("Erro no login:", error.code, error.message);
@@ -158,7 +168,6 @@
             showLoading('Criando conta...');
             try {
                 await createUserWithEmailAndPassword(auth, email, password);
-                 // onAuthStateChanged cuidará de iniciar o app após o cadastro
                 showMessage('Cadastro realizado com sucesso! Você está logado.', 'success');
             } catch (error) {
                 console.error("Erro no cadastro:", error.code, error.message);
@@ -178,7 +187,6 @@
             showLoading('Saindo...');
             try {
                 await signOut(auth);
-                // onAuthStateChanged será disparado, mostrando a tela de login.
                 showMessage('Sessão encerrada com sucesso.', 'info');
                 // Limpa o estado da aplicação
                 state.patients = [];
@@ -434,9 +442,6 @@
             setTimeout(() => modal.classList.add('hidden', 'opacity-0'), 300);
         };
         
-        // Custom Message Box (replacing alert/confirm)
-        // (Function showMessage already defined in UTILS section)
-
         const renderApp = () => {
              // Inicia a renderização do app principal (Dashboard) após o login
              renderView();
@@ -491,7 +496,7 @@
             attachEventListeners();
         };
 
-        // --- NOVO: FUNÇÃO PARA RENDERIZAR A TELA DE LOGIN/CADASTRO ---
+        // --- FUNÇÃO PARA RENDERIZAR A TELA DE LOGIN/CADASTRO ---
         const renderLoginScreen = () => {
             const authContent = document.getElementById('auth-content');
             
@@ -1219,8 +1224,8 @@ Data: ${new Date().toLocaleDateString('pt-BR')}
             window.showDocumentModal = showDocumentModal;
             window.showDeleteConfirmation = showDeleteConfirmation;
             window.openWhatsAppChat = openWhatsAppChat;
-            window.handleLogout = handleLogout; // Nova função exposta
-            // window.toggleAuthMode já está exposta.
+            window.handleLogout = handleLogout;
+            window.toggleAuthMode = toggleAuthMode;
         };
 
     </script>
