@@ -6,26 +6,20 @@
     <title>PsychoPro | Gestão de Consultório</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // ATUALIZAÇÃO: Importadas funções de login, cadastro, logout e onAuthStateChanged
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         
-        // =========================================================================
-        // === CONFIGURAÇÕES DO FIREBASE (FORNECIDAS PELO USUÁRIO) ===
-        // =========================================================================
-        const firebaseConfig = {
-            apiKey: "AIzaSyDTjGnO9D4fljHA0ucTBujw_n1PSAFatkE",
-            authDomain: "studio-873001119-21845.firebaseapp.com",
-            projectId: "studio-873001119-21845",
-            storageBucket: "studio-873001119-21845.firebasestorage.app",
-            messagingSenderId: "842279750292",
-            appId: "1:842279750292:web:62583e78f06ca68a6e0281"
-        };
-        
-        const appId = firebaseConfig.appId;
-        const initialAuthToken = null; 
+        // Configurações e Variáveis Globais (Fornecidas pelo ambiente Canvas)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { /* Mock config */ };
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         let app, db, auth, storage, userId;
         const state = {
@@ -34,11 +28,12 @@
             appointments: [],
             finances: [],
             activePatient: null, // Patient object for detail view
-            isAuthReady: false
+            isAuthReady: false,
+            isRegisterMode: false // Novo estado para alternar entre login/cadastro
         };
 
         // --- UTILS ---
-
+        
         // Helper para formatar data e hora
         const formatDateTime = (timestamp) => {
             if (!timestamp) return 'N/A';
@@ -51,53 +46,162 @@
         const formatCurrency = (amount) => {
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount);
         };
+        
+        const showLoading = (text = 'Processando...') => {
+            const overlay = document.getElementById('loading-overlay');
+            document.getElementById('loading-text-main').textContent = text;
+            document.getElementById('loading-text-sub').textContent = '';
+            overlay.classList.remove('hidden', 'opacity-0');
+            setTimeout(() => overlay.classList.add('opacity-100'), 10);
+        };
 
-        const getPatientById = (id) => state.patients.find(p => p.id === id);
-
+        const hideLoading = () => {
+            const overlay = document.getElementById('loading-overlay');
+            overlay.classList.remove('opacity-100');
+            setTimeout(() => {
+                 overlay.classList.add('hidden', 'opacity-0');
+                 document.getElementById('loading-text-sub').textContent = 'Autenticando com Firebase.'; // Reset sub text
+            }, 300);
+        };
+        
+        const showMessage = (text, type = 'info', duration = 3000) => {
+            const msgBox = document.getElementById('message-box');
+            msgBox.textContent = text;
+            msgBox.className = `p-3 rounded-lg shadow-xl text-white fixed bottom-20 left-1/2 transform -translate-x-1/2 transition-opacity duration-300 opacity-0 z-50`;
+            if (type === 'success') msgBox.classList.add('bg-green-600');
+            else if (type === 'error') msgBox.classList.add('bg-red-600');
+            else msgBox.classList.add('bg-blue-600');
+            setTimeout(() => {
+                msgBox.classList.remove('opacity-0');
+                msgBox.classList.add('opacity-100');
+            }, 10);
+            setTimeout(() => {
+                msgBox.classList.remove('opacity-100');
+                msgBox.classList.add('opacity-0');
+            }, duration);
+        };
 
         // --- FIREBASE INITIALIZATION & AUTH ---
 
+        const privatePath = (collectionName) => `/artifacts/${appId}/users/${userId}/${collectionName}`;
+
         const initializeFirebase = async () => {
+            showLoading('Inicializando o sistema...');
             try {
-                // CORREÇÃO: Usando a config fornecida diretamente
-                app = initializeApp(firebaseConfig);
+                if (Object.keys(firebaseConfig).length === 0) {
+                    console.error("Firebase Config not available. Using mock initialization.");
+                    app = initializeApp({});
+                } else {
+                    app = initializeApp(firebaseConfig);
+                }
                 
                 db = getFirestore(app);
                 auth = getAuth(app);
                 storage = getStorage(app);
 
-                // Autenticação (Requer a ativação do método "Anônimo" no Console do Firebase)
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
+                // ATUALIZAÇÃO: Monitora o estado de autenticação (user)
                 onAuthStateChanged(auth, (user) => {
+                    state.isAuthReady = true;
+                    
+                    const authOverlay = document.getElementById('auth-overlay');
+
                     if (user) {
                         userId = user.uid;
-                        state.isAuthReady = true;
                         console.log("Usuário autenticado:", userId);
-                        // Iniciar listeners após a autenticação
+                        // Usuário logado: esconde a tela de login e inicia o carregamento dos dados
+                        authOverlay.classList.add('hidden'); 
                         startDataListeners();
-                        renderApp();
+                        renderApp(); // Renderiza a view principal (Dashboard)
+                        hideLoading();
                     } else {
-                        console.log("Nenhum usuário autenticado.");
-                        state.isAuthReady = true;
-                        renderApp();
+                        console.log("Nenhum usuário autenticado. Exibindo tela de login.");
+                        userId = null;
+                        // Usuário deslogado: exibe a tela de login/cadastro
+                        authOverlay.classList.remove('hidden'); 
+                        renderLoginScreen();
+                        hideLoading();
                     }
                 });
+                
+                // Tenta autenticação customizada se houver token (para ambientes Canvas)
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                }
+
             } catch (error) {
                 console.error("Erro ao inicializar Firebase ou Autenticar:", error);
-                // Exibe o erro no loading
-                const overlay = document.getElementById('loading-overlay');
-                overlay.innerHTML = `<p class="text-red-700 font-semibold">ERRO FATAL: Falha na autenticação ou inicialização do Firebase.</p><p class="text-sm text-red-500">${error.message}</p>`;
+                hideLoading();
             }
+        };
+
+        // --- HANDLERS DE AUTENTICAÇÃO (NOVOS) ---
+        
+        const handleLogin = async (email, password) => {
+            showLoading('Entrando...');
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged cuidará de iniciar o app após o login
+                showMessage('Login realizado com sucesso!', 'success');
+            } catch (error) {
+                console.error("Erro no login:", error.code, error.message);
+                if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                     showMessage('E-mail ou senha inválidos.', 'error');
+                } else {
+                     showMessage(`Erro ao tentar logar: ${error.code}.`, 'error');
+                }
+            } finally {
+                hideLoading();
+            }
+        };
+
+        const handleRegister = async (email, password) => {
+            showLoading('Criando conta...');
+            try {
+                await createUserWithEmailAndPassword(auth, email, password);
+                 // onAuthStateChanged cuidará de iniciar o app após o cadastro
+                showMessage('Cadastro realizado com sucesso! Você está logado.', 'success');
+            } catch (error) {
+                console.error("Erro no cadastro:", error.code, error.message);
+                if (error.code === 'auth/email-already-in-use') {
+                    showMessage('Este e-mail já está em uso. Tente fazer login.', 'error');
+                } else if (error.code === 'auth/weak-password') {
+                    showMessage('Senha fraca. Use pelo menos 6 caracteres.', 'error');
+                } else {
+                    showMessage(`Erro ao tentar cadastrar: ${error.code}.`, 'error');
+                }
+            } finally {
+                hideLoading();
+            }
+        };
+
+        const handleLogout = async () => {
+            showLoading('Saindo...');
+            try {
+                await signOut(auth);
+                // onAuthStateChanged será disparado, mostrando a tela de login.
+                showMessage('Sessão encerrada com sucesso.', 'info');
+                // Limpa o estado da aplicação
+                state.patients = [];
+                state.appointments = [];
+                state.finances = [];
+                state.activePatient = null;
+                navigateTo('dashboard');
+            } catch (error) {
+                console.error("Erro ao sair:", error);
+                showMessage('Erro ao sair. Tente novamente.', 'error');
+            } finally {
+                hideLoading();
+            }
+        };
+
+        // Função para alternar entre Login e Cadastro na tela de autenticação
+        window.toggleAuthMode = (isRegister) => {
+            state.isRegisterMode = isRegister;
+            renderLoginScreen();
         };
 
         // --- FIREBASE DATA LISTENERS ---
 
-        const privatePath = (collectionName) => `users/${userId}/${collectionName}`; // Caminho simplificado para o Firestore
         const startDataListeners = () => {
             if (!userId) return;
 
@@ -110,11 +214,10 @@
                 console.error("Erro ao ouvir pacientes:", error);
             });
 
-            // 2. Appointments Listener (Otimizado: apenas consultas futuras/hoje)
-            const todayISO = new Date().toISOString().substring(0, 10);
+            // 2. Appointments Listener
             const qAppointments = query(
                 collection(db, privatePath('appointments')),
-                where('date', '>=', todayISO) // Filtro de otimização
+                // Adicionar filtro para mostrar apenas consultas futuras + as de hoje (opcional, mas bom para otimizar)
             );
             onSnapshot(qAppointments, (snapshot) => {
                 state.appointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -135,41 +238,34 @@
             // Note: Records and Documents will be fetched on demand (e.g., in PatientDetail)
         };
 
-        // --- LINK GENERATION (REAL GOOGLE CALENDAR) ---
-        
-        // NOVO CÓDIGO: Gera a URL de Criação de Evento do Google Agenda pré-preenchida
-        // O usuário clica neste link e, dentro do Google Agenda, gera o link do Meet final.
-        const generateGoogleMeetLink = (patientName, date, time) => {
-            // Retorna um link de atalho caso falhe em obter os dados
-            if (!patientName || !date || !time) {
-                return `https://calendar.google.com/calendar/r/eventedit?text=Nova+Consulta+Psicologia&details=Agendamento+rápido+PsychoPro.&sf=true`;
-            }
-            
-            // Configura a duração do evento (1 hora)
-            const startDate = new Date(date + 'T' + time + ':00');
-            // Corrige se o fuso horário local for diferente do UTC, garantindo a data correta
-            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); 
-            
-            const formatTime = (d) => {
-                // Formato necessário: yyyyMMddTHHmmssZ (ISO 8601 básico em UTC)
-                return d.toISOString().replace(/[:-]/g, '').substring(0, 15) + 'Z';
-            }
+        // --- CRUD OPERATIONS ---
 
-            const start = formatTime(startDate);
-            const end = formatTime(endDate);
-            
-            const title = encodeURIComponent(`Consulta Psicológica - ${patientName}`);
-            const details = encodeURIComponent(`Consulta de ${patientName}. Clique em "Adicionar Conferência" ou "Add Google Meet" para gerar o link da reunião.`);
-            
-            // Link que preenche o Google Agenda
-            return `https://calendar.google.com/calendar/r/eventedit?text=${title}&dates=${start}/${end}&details=${details}&sf=true`;
+        const saveRecord = async (recordData, appointmentId, patientId) => {
+            if (!userId) return;
+            try {
+                // Atualiza o registro (cria se não existir, usa appointmentId como ID do documento)
+                await setDoc(doc(db, privatePath('records'), appointmentId), {
+                    ...recordData,
+                    patientId: patientId,
+                    updatedAt: serverTimestamp(),
+                    userId: userId
+                }, { merge: true });
+
+                // Marca a consulta como concluída
+                await updateDoc(doc(db, privatePath('appointments'), appointmentId), {
+                    status: 'Completed',
+                    updatedAt: serverTimestamp()
+                });
+
+                showMessage('Registro de atendimento salvo e consulta marcada como concluída!', 'success');
+            } catch (error) {
+                console.error("Erro ao salvar registro:", error);
+                showMessage('Erro ao salvar registro. Tente novamente.', 'error');
+            }
         };
-        
-        // --- CRUD OPERATIONS (COM LOADING) ---
 
         const savePatient = async (patientData, patientId = null) => {
             if (!userId) return;
-            showLoading('Salvando paciente...');
             try {
                 if (patientId) {
                     await updateDoc(doc(db, privatePath('patients'), patientId), patientData);
@@ -185,14 +281,10 @@
             } catch (error) {
                 console.error("Erro ao salvar paciente:", error);
                 showMessage('Erro ao salvar paciente. Tente novamente.', 'error');
-            } finally {
-                hideLoading();
             }
         };
-
         const deletePatient = async (patientId) => {
             if (!userId) return;
-            showLoading('Excluindo paciente...');
             try {
                 await deleteDoc(doc(db, privatePath('patients'), patientId));
                 showMessage('Paciente excluído com sucesso!', 'success');
@@ -200,29 +292,16 @@
             } catch (error) {
                 console.error("Erro ao excluir paciente:", error);
                 showMessage('Erro ao excluir paciente. Tente novamente.', 'error');
-            } finally {
-                hideLoading();
             }
         };
-
         const saveAppointment = async (appointmentData, appointmentId = null) => {
             if (!userId) return;
-            showLoading('Salvando consulta...');
             try {
-                // 1. Obtém o nome do paciente
-                const patientName = state.patients.find(p => p.id === appointmentData.patientId)?.fullName || 'Paciente Removido';
-                
-                // 2. Chama a nova função com os dados necessários (nome, data, hora)
-                const meetLink = appointmentData.meetLink || generateGoogleMeetLink(
-                    patientName, 
-                    appointmentData.date, 
-                    appointmentData.time
-                );
-                
+                const meetLink = appointmentData.meetLink || generateGoogleMeetLink(); // Gerar Meet Link
                 const dataToSave = {
                     ...appointmentData,
-                    meetLink, // Agora contém o link do Google Agenda
-                    patientName: patientName, // Usa o nome obtido acima
+                    meetLink,
+                    patientName: state.patients.find(p => p.id === appointmentData.patientId)?.fullName || 'Paciente Removido',
                     updatedAt: serverTimestamp(),
                     userId: userId
                 };
@@ -235,33 +314,25 @@
                         status: 'Scheduled',
                         createdAt: serverTimestamp(),
                     });
-                    showMessage('Consulta agendada com sucesso! Link do Agenda gerado.', 'success');
+                    showMessage('Consulta agendada com sucesso! Link do Meet gerado.', 'success');
                 }
             } catch (error) {
                 console.error("Erro ao salvar consulta:", error);
                 showMessage('Erro ao salvar consulta. Tente novamente.', 'error');
-            } finally {
-                hideLoading();
             }
         };
-
         const deleteAppointment = async (appointmentId) => {
             if (!userId) return;
-            showLoading('Cancelando consulta...');
             try {
                 await deleteDoc(doc(db, privatePath('appointments'), appointmentId));
                 showMessage('Consulta cancelada com sucesso.', 'success');
             } catch (error) {
                 console.error("Erro ao excluir consulta:", error);
                 showMessage('Erro ao excluir consulta. Tente novamente.', 'error');
-            } finally {
-                hideLoading();
             }
         };
-
         const saveFinanceRecord = async (recordData) => {
             if (!userId) return;
-            showLoading('Registrando transação...');
             try {
                 await addDoc(collection(db, privatePath('finances')), {
                     ...recordData,
@@ -274,29 +345,37 @@
             } catch (error) {
                 console.error("Erro ao salvar registro financeiro:", error);
                 showMessage('Erro ao salvar registro financeiro. Tente novamente.', 'error');
-            } finally {
-                hideLoading();
             }
         };
-
         const deleteFinanceRecord = async (recordId) => {
             if (!userId) return;
-            showLoading('Excluindo registro financeiro...');
             try {
                 await deleteDoc(doc(db, privatePath('finances'), recordId));
                 showMessage('Registro financeiro excluído.', 'success');
             } catch (error) {
                 console.error("Erro ao excluir registro financeiro:", error);
                 showMessage('Erro ao excluir registro financeiro. Tente novamente.', 'error');
-            } finally {
-                hideLoading();
             }
         };
 
+        // --- LOGIC AND HELPERS ---
+
+        const generateGoogleMeetLink = () => {
+            // Simulação de link do Meet (links reais requerem a API do Google Calendar)
+            const randomId = Math.random().toString(36).substring(2, 8);
+            return `https://meet.google.com/psico-${randomId}`;
+        };
+
+        const openWhatsAppChat = (number, message) => {
+            const url = `https://wa.me/${number.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+            window.open(url, '_blank');
+        };
+
+        const getPatientById = (id) => state.patients.find(p => p.id === id);
+        
         const uploadDocument = async (fileName, pdfContentBase64) => {
              if (!userId) return;
-             showLoading('Fazendo upload do documento...');
-             try {
+            try {
                 // Simulação de upload de PDF para o Firebase Storage
                 const storageRefPath = `documents/${userId}/${fileName}_${Date.now()}.pdf`;
                 const storageReference = storageRef(storage, storageRefPath);
@@ -311,83 +390,15 @@
                 console.error("Erro ao fazer upload do documento:", error);
                 showMessage('Erro ao gerar/salvar PDF. Verifique o console.', 'error');
                 return null;
-            } finally {
-                hideLoading();
             }
-        };
-        
-        const saveRecord = async (recordData, appointmentId, patientId) => {
-            if (!userId) return;
-            showLoading('Salvando registro de sessão...');
-            try {
-                await setDoc(doc(db, privatePath('records'), appointmentId), {
-                    ...recordData,
-                    patientId,
-                    updatedAt: serverTimestamp(),
-                    userId
-                }, { merge: true });
-                // Atualizar status da consulta para Completed (opcional, mas útil)
-                await updateDoc(doc(db, privatePath('appointments'), appointmentId), { status: 'Completed' });
-
-                showMessage('Registro de atendimento salvo e atualizado!', 'success');
-            } catch (error) {
-                console.error("Erro ao salvar registro de atendimento:", error);
-                showMessage('Erro ao salvar registro. Tente novamente.', 'error');
-            } finally {
-                hideLoading();
-            }
-        };
-
-        // --- LOGIC AND HELPERS ---
-
-        const openWhatsAppChat = (number, message) => {
-            const url = `https://wa.me/${number.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-            window.open(url, '_blank');
         };
 
         // --- UI/UX & RENDERING ---
-        
-        // Custom Loading Overlay for CRUD operations
-        const showLoading = (message = 'Processando...') => {
-            const overlay = document.getElementById('loading-overlay');
-            overlay.classList.remove('hidden', 'opacity-0');
-            overlay.classList.add('opacity-100');
-            overlay.innerHTML = `
-                <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-600"></div>
-                <p class="mt-4 text-indigo-700 font-semibold">${message}</p>
-            `;
-        };
-
-        const hideLoading = () => {
-            const overlay = document.getElementById('loading-overlay');
-            overlay.classList.remove('opacity-100');
-            overlay.classList.add('opacity-0');
-            // Wait for transition before hiding completely
-            setTimeout(() => {
-                overlay.classList.add('hidden');
-                // Restore initial loading message for next app start/refresh
-                overlay.innerHTML = `
-                    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-600"></div>
-                    <p class="mt-4 text-indigo-700 font-semibold">Carregando Plataforma...</p>
-                    <p class="text-sm text-indigo-500">Autenticando com Firebase.</p>
-                `;
-            }, 300);
-        };
-
 
         const navigateTo = (view, data = null) => {
             if (view === 'patientDetail' && data) {
-                // data agora é o ID
-                const patient = getPatientById(data);
-                if (!patient) {
-                    showMessage('Erro ao carregar paciente. ID inválido.', 'error');
-                    return;
-                }
-                state.activePatient = patient;
+                state.activePatient = data;
                 state.currentView = 'patientDetail';
-            } else if (view === 'editPatient' && data) {
-                state.activePatient = getPatientById(data);
-                state.currentView = 'editPatient';
             } else {
                 state.currentView = view;
                 state.activePatient = null;
@@ -408,29 +419,44 @@
             }
         };
         
-        // Custom Message Box (replacing alert/confirm)
-        const showMessage = (text, type = 'info', duration = 3000) => {
-            const msgBox = document.getElementById('message-box');
-            msgBox.textContent = text;
-            msgBox.className = `p-3 rounded-lg shadow-xl text-white fixed bottom-20 left-1/2 transform -translate-x-1/2 transition-opacity duration-300 opacity-0 z-50`;
-            if (type === 'success') msgBox.classList.add('bg-green-600');
-            else if (type === 'error') msgBox.classList.add('bg-red-600');
-            else msgBox.classList.add('bg-blue-600');
-            setTimeout(() => {
-                msgBox.classList.remove('opacity-0');
-                msgBox.classList.add('opacity-100');
-            }, 10);
-            setTimeout(() => {
-                msgBox.classList.remove('opacity-100');
-                msgBox.classList.add('opacity-0');
-            }, duration);
+        const showModal = (content, title, modalId = 'general-modal') => {
+            const modal = document.getElementById(modalId);
+            document.getElementById(`${modalId}-title`).textContent = title;
+            document.getElementById(`${modalId}-content`).innerHTML = content;
+            modal.classList.remove('hidden', 'opacity-0');
+            setTimeout(() => modal.classList.add('opacity-100'), 10);
+            lucide.createIcons(); // Render icons inside modal
         };
 
+        const closeModal = (modalId = 'general-modal') => {
+            const modal = document.getElementById(modalId);
+            modal.classList.remove('opacity-100');
+            setTimeout(() => modal.classList.add('hidden', 'opacity-0'), 300);
+        };
+        
+        // Custom Message Box (replacing alert/confirm)
+        // (Function showMessage already defined in UTILS section)
+
+        const renderApp = () => {
+             // Inicia a renderização do app principal (Dashboard) após o login
+             renderView();
+        };
 
         const renderView = () => {
+            // Só renderiza se estiver autenticado. Se não estiver, a tela de login estará visível.
+            if (!userId) return; 
+
             const content = document.getElementById('app-content');
             const view = state.currentView;
             let html = '';
+
+            // Atualiza o estado visual do sidebar
+            document.querySelectorAll('#sidebar nav button').forEach(btn => {
+                btn.classList.remove('sidebar-item-active');
+            });
+            const activeNav = document.querySelector(`#sidebar nav button[onclick="navigateTo('${view.startsWith('patient') ? 'patients' : view}')"]`);
+            if (activeNav) activeNav.classList.add('sidebar-item-active');
+
 
             switch (view) {
                 case 'dashboard':
@@ -465,162 +491,51 @@
             attachEventListeners();
         };
 
-        const renderApp = () => {
-            if (state.isAuthReady) {
-                hideLoading(); // Esconde o loading inicial
-                renderView();
-            }
-        };
-
-        // --- EVENT HANDLERS (Non-intrusive JS) ---
-
-        const handleNavigationClick = (e) => {
-            e.preventDefault();
-            const view = e.currentTarget.getAttribute('data-view');
-            const data = e.currentTarget.getAttribute('data-data');
-            navigateTo(view, data);
-        };
-
-        const handlePatientFormSubmit = async (e) => {
-            e.preventDefault();
-            const form = e.target;
+        // --- NOVO: FUNÇÃO PARA RENDERIZAR A TELA DE LOGIN/CADASTRO ---
+        const renderLoginScreen = () => {
+            const authContent = document.getElementById('auth-content');
             
-            // Validação de WhatsApp
-            const whatsapp = form.whatsapp.value.replace(/\D/g, '');
-            if (!whatsapp || whatsapp.length < 8) {
-                showMessage('Número de WhatsApp inválido. Formato: (XX) XXXXX-XXXX', 'error');
-                return;
-            }
+            const title = state.isRegisterMode ? 'Crie Sua Conta' : 'Acesse Sua Conta';
+            const buttonText = state.isRegisterMode ? 'Cadastrar' : 'Entrar';
+            const switchText = state.isRegisterMode ? 'Já tem conta? Fazer Login' : 'Não tem conta? Cadastre-se';
 
-            // CORREÇÃO: Usar form.elements.id para evitar conflito de nome 'id' e resolver o TypeError
-            const patientId = form.elements.id.value; 
+            authContent.innerHTML = `
+                <div class="p-8 w-full max-w-sm">
+                    <h1 class="text-3xl font-bold text-indigo-600 mb-2">PsychoPro</h1>
+                    <h2 class="text-xl font-semibold text-gray-700 mb-6">${title}</h2>
+                    
+                    <form id="auth-form" class="space-y-4">
+                        <div class="space-y-2">
+                            <label for="email" class="block text-sm font-medium text-gray-700">E-mail</label>
+                            <input type="email" id="auth-email" name="email" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="seu@email.com">
+                        </div>
+                        <div class="space-y-2">
+                            <label for="password" class="block text-sm font-medium text-gray-700">Senha</label>
+                            <input type="password" id="auth-password" name="password" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="Mínimo 6 caracteres">
+                        </div>
+                        
+                        <button type="submit" class="w-full p-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition">
+                            ${buttonText}
+                        </button>
+                    </form>
 
-            const patientData = {
-                fullName: form.fullName.value,
-                age: form.age.value ? parseInt(form.age.value) : null,
-                contacts: {
-                    whatsapp: form.whatsapp.value,
-                    email: form.email.value,
-                },
-                address: form.address.value,
-                clinicalHistory: form.clinicalHistory.value,
-                medications: form.medications.value,
-                observations: form.observations.value,
-            };
-            
-            await savePatient(patientData, patientId || null);
-            navigateTo('patients');
-        };
+                    <button onclick="toggleAuthMode(${!state.isRegisterMode})" class="w-full mt-4 text-sm text-indigo-600 hover:text-indigo-800 transition font-medium">
+                        ${switchText}
+                    </button>
+                </div>
+            `;
 
-        const attachEventListeners = () => {
-            // 1. Navigation Listeners (Sidebar and Footer)
-            document.querySelectorAll('[data-view]').forEach(element => {
-                element.removeEventListener('click', handleNavigationClick); // Previne duplicidade
-                element.addEventListener('click', handleNavigationClick);
-            });
-
-            // 2. Patient Form Submit
-            document.getElementById('patient-form')?.addEventListener('submit', handlePatientFormSubmit);
-
-            // 3. Appointment Form Submit (Existing logic, adding loading state)
-            document.getElementById('appointment-form')?.addEventListener('submit', async (e) => {
+            // Adiciona o listener para o formulário de autenticação
+            document.getElementById('auth-form')?.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const form = e.target;
-                const appointmentData = {
-                    patientId: form.patientId.value,
-                    date: form.date.value,
-                    time: form.time.value,
-                    type: form.type.value,
-                    notes: form.notes.value,
-                    // meetLink será gerado na saveAppointment()
-                };
-                const appointmentId = form.getAttribute('data-app-id');
-                await saveAppointment(appointmentData, appointmentId || null);
-                closeModal();
-                navigateTo('agenda');
-            });
+                const email = document.getElementById('auth-email').value;
+                const password = document.getElementById('auth-password').value;
 
-            // 4. Record Form Submit (Existing logic, adding loading state)
-            document.getElementById('record-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const form = e.target;
-                const appointmentId = form.getAttribute('data-app-id');
-                const patientId = form.getAttribute('data-patient-id');
-                
-                const recordData = {
-                    queixaPrincipal: form.queixaPrincipal.value,
-                    assuntosDiscutidos: form.assuntosDiscutidos.value,
-                    tarefasSugestoes: form.tarefasSugestoes.value,
-                };
-                await saveRecord(recordData, appointmentId, patientId);
-                closeModal();
-            });
-
-            // 5. Finance Form Submit (Existing logic, adding loading state)
-            document.getElementById('finance-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const form = e.target;
-                const financeData = {
-                    type: form.type.value,
-                    description: form.description.value,
-                    amount: form.amount.value,
-                    date: form.date.value,
-                };
-                await saveFinanceRecord(financeData);
-                closeModal();
-                navigateTo('finance');
-            });
-
-            // 6. Document Form Submit (Simulation of PDF Generation and Storage)
-            document.getElementById('document-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const form = e.target;
-                const patientId = form.getAttribute('data-patient-id');
-                const patientName = form.getAttribute('data-patient-name');
-                const docType = form.docType.value;
-                const docContent = form.docContent.value;
-                
-                showMessage('Gerando PDF e fazendo upload...', 'info', 5000);
-                // --- PDF Generation Simulation (A real application would use jsPDF or similar) ---
-                const pdfContent = ` --- ${docType.toUpperCase().replace(/SIMPLES|ACOMPANHAMENTO/g, '').replace('ATTESTADO', 'ATESTADO')} ---
-Paciente: ${patientName}
-Conteúdo: ${docContent}
-_________________________
-Assinatura do Psicólogo(a)
-Data: ${new Date().toLocaleDateString('pt-BR')} `;
-                
-                // Simple Base64 encoding of the text content for storage simulation
-                const pdfBase64 = btoa(pdfContent);
-                const downloadURL = await uploadDocument(`${docType}_${patientName}`, pdfBase64);
-
-                if (downloadURL) {
-                    // Salvar referência no Firestore (Documents Collection)
-                    await addDoc(collection(db, privatePath('documents')), {
-                        patientId,
-                        patientName,
-                        type: docType,
-                        contentSummary: docContent.substring(0, 100) + '...',
-                        fileUrl: downloadURL,
-                        createdAt: serverTimestamp(),
-                        userId: userId
-                    });
-                    showMessage('Documento gerado, salvo no Storage e referenciado no Firestore!', 'success');
-                    closeModal();
+                if (state.isRegisterMode) {
+                    await handleRegister(email, password);
+                } else {
+                    await handleLogin(email, password);
                 }
-            });
-
-            // 7. Confirmation Delete Button
-            document.getElementById('confirm-delete-btn')?.addEventListener('click', async (e) => {
-                const dataType = e.target.getAttribute('data-type');
-                const id = e.target.getAttribute('data-id');
-                if (dataType === 'patient') {
-                    await deletePatient(id);
-                } else if (dataType === 'appointment') {
-                    await deleteAppointment(id);
-                } else if (dataType === 'finance') {
-                    await deleteFinanceRecord(id);
-                }
-                closeModal('confirmation-modal');
             });
         };
 
@@ -634,13 +549,7 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
                 .slice(0, 5); // Próximas 5
 
             const totalPatients = state.patients.length;
-            
-            // CORREÇÃO LÓGICA: Calcular receita apenas do mês atual
-            const currentMonth = new Date().toISOString().substring(0, 7);
-            const monthlyIncome = state.finances
-                .filter(f => f.type === 'income' && f.date && f.date.substring(0, 7) === currentMonth)
-                .reduce((sum, f) => sum + f.amount, 0);
-
+            const patientAcronym = totalPatients > 0 ? state.patients[0].fullName.split(' ').map(n => n[0]).join('') : 'PP';
             return `
                 <div class="p-4 space-y-6">
                     <h1 class="text-3xl font-bold text-gray-800">Olá, Psicólogo!</h1>
@@ -651,22 +560,22 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
                             <div class="text-xs text-gray-500 mt-1">Pacientes Ativos</div>
                         </div>
                         <div>
-                            <div class="text-2xl font-extrabold text-green-600">${nextAppointments.filter(a => a.date === today).length}</div>
-                            <div class="text-xs text-gray-500 mt-1">Atendimentos Hoje</div>
+                            <div class="text-2xl font-extrabold text-green-600">${nextAppointments.length}</div>
+                            <div class="text-xs text-gray-500 mt-1">Próximos Atendimentos</div>
                         </div>
                         <div>
-                            <div class="text-2xl font-extrabold text-blue-600">${formatCurrency(monthlyIncome)}</div>
-                            <div class="text-xs text-gray-500 mt-1">Receita Mês (Atual)</div>
+                            <div class="text-2xl font-extrabold text-blue-600">${formatCurrency(state.finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.amount, 0))}</div>
+                            <div class="text-xs text-gray-500 mt-1">Receita Total (Simulado)</div>
                         </div>
                     </div>
 
                     <h2 class="text-xl font-semibold text-gray-700">Acesso Rápido</h2>
                     <div class="grid grid-cols-2 gap-4">
-                        <button data-view="addPatient" class="bg-indigo-500 text-white p-4 rounded-xl shadow-md hover:bg-indigo-600 transition flex items-center justify-center space-x-2">
+                        <button onclick="navigateTo('addPatient')" class="bg-indigo-500 text-white p-4 rounded-xl shadow-md hover:bg-indigo-600 transition flex items-center justify-center space-x-2">
                             <i data-lucide="user-plus" class="w-6 h-6"></i>
                             <span class="font-medium">Novo Paciente</span>
                         </button>
-                        <button id="quick-schedule-btn" onclick="showAppointmentModal()" class="bg-green-500 text-white p-4 rounded-xl shadow-md hover:bg-green-600 transition flex items-center justify-center space-x-2">
+                        <button onclick="showAppointmentModal()" class="bg-green-500 text-white p-4 rounded-xl shadow-md hover:bg-green-600 transition flex items-center justify-center space-x-2">
                             <i data-lucide="calendar-plus" class="w-6 h-6"></i>
                             <span class="font-medium">Agendar Consulta</span>
                         </button>
@@ -691,7 +600,7 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
         
         const renderPatientList = () => {
             const patientCards = state.patients.map(p => `
-                <div data-view="patientDetail" data-data="${p.id}" class="bg-white p-4 rounded-xl shadow-md flex items-center space-x-4 border-l-4 border-blue-500 hover:shadow-lg transition cursor-pointer">
+                <div onclick="navigateTo('patientDetail', ${JSON.stringify(p).replace(/"/g, '&quot;')})" class="bg-white p-4 rounded-xl shadow-md flex items-center space-x-4 border-l-4 border-blue-500 hover:shadow-lg transition cursor-pointer">
                     <div class="w-12 h-12 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full font-bold text-xl">${p.fullName.split(' ').map(n => n[0]).join('')}</div>
                     <div class="flex-grow">
                         <div class="font-semibold text-gray-800">${p.fullName}</div>
@@ -705,7 +614,7 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
                 <div class="p-4">
                     <div class="flex justify-between items-center mb-6">
                         <h1 class="text-2xl font-bold text-gray-800">Pacientes (${state.patients.length})</h1>
-                        <button data-view="addPatient" class="p-2 bg-indigo-500 text-white rounded-full shadow-md hover:bg-indigo-600 transition">
+                        <button onclick="navigateTo('addPatient')" class="p-2 bg-indigo-500 text-white rounded-full shadow-md hover:bg-indigo-600 transition">
                             <i data-lucide="plus" class="w-6 h-6"></i>
                         </button>
                     </div>
@@ -735,7 +644,7 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
                             </div>
                             <div class="space-y-2">
                                 <label for="whatsapp" class="block text-sm font-medium text-gray-700">WhatsApp <span class="text-red-500">*</span></label>
-                                <input type="tel" id="whatsapp" name="whatsapp" value="${patient?.contacts?.whatsapp || ''}" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="(XX) XXXXX-XXXX">
+                                <input type="tel" id="whatsapp" name="whatsapp" value="${patient?.contacts?.whatsapp || ''}" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
                             </div>
                         </div>
 
@@ -762,7 +671,7 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
                         </div>
 
                         <div class="flex space-x-4 pt-4">
-                            <button type="button" data-view="patients" class="flex-1 p-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition">Cancelar</button>
+                            <button type="button" onclick="navigateTo('patients')" class="flex-1 p-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition">Cancelar</button>
                             <button type="submit" class="flex-1 p-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition">
                                 ${isEdit ? 'Salvar Alterações' : 'Cadastrar Paciente'}
                             </button>
@@ -782,7 +691,7 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
             return `
                 <div class="p-4 space-y-6">
                     <div class="flex items-center space-x-4 mb-4">
-                        <button data-view="patients" class="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition">
+                        <button onclick="navigateTo('patients')" class="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition">
                             <i data-lucide="arrow-left" class="w-6 h-6 text-gray-600"></i>
                         </button>
                         <h1 class="text-2xl font-bold text-gray-800">${patient.fullName}</h1>
@@ -795,7 +704,7 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
                     </div>
 
                     <div class="grid grid-cols-3 gap-3">
-                        <button data-view="editPatient" data-data="${patient.id}" class="p-3 bg-blue-500 text-white rounded-xl text-xs font-semibold hover:bg-blue-600 transition flex flex-col items-center">
+                        <button onclick="navigateTo('editPatient', ${JSON.stringify(patient).replace(/"/g, '&quot;')})" class="p-3 bg-blue-500 text-white rounded-xl text-xs font-semibold hover:bg-blue-600 transition flex flex-col items-center">
                             <i data-lucide="pencil" class="w-4 h-4 mb-1"></i> Editar
                         </button>
                         <button onclick="showAppointmentModal(null, '${patient.id}')" class="p-3 bg-green-500 text-white rounded-xl text-xs font-semibold hover:bg-green-600 transition flex flex-col items-center">
@@ -821,8 +730,7 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
                             <div onclick="showRecordModal('${app.id}', '${patient.id}')" class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-gray-400 flex justify-between items-center hover:shadow-md transition cursor-pointer">
                                 <div>
                                     <div class="font-bold text-gray-800">Sessão de ${new Date(app.date).toLocaleDateString('pt-BR')}</div>
-                                    <div class="text-sm text-gray-500">${app.type}</div>
-                                    <a href="${app.meetLink}" target="_blank" class="text-xs text-indigo-500 hover:text-indigo-700 flex items-center mt-1"><i data-lucide="link" class="w-3 h-3 mr-1"></i> Link (Agenda)</a>
+                                    <div class="text-sm text-gray-500">${app.type} - ${app.time}</div>
                                 </div>
                                 <div class="text-xs font-semibold px-2 py-1 rounded-full ${app.status === 'Completed' ? 'text-green-600 bg-green-100' : 'text-yellow-600 bg-yellow-100'}">${app.status === 'Completed' ? 'Concluída' : 'Agendada'}</div>
                             </div>
@@ -840,9 +748,9 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
             // Lógica para visualização semanal/mensal (simplesmente lista por enquanto)
             const sortedAppointments = state.appointments
                 .sort((a, b) => new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time));
-            
+
             const appointmentsGroupedByDate = sortedAppointments.reduce((acc, app) => {
-                const dateKey = new Date(app.date).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                const dateKey = new Date(app.date).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
                 if (!acc[dateKey]) {
                     acc[dateKey] = [];
                 }
@@ -850,34 +758,43 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
                 return acc;
             }, {});
 
-            const agendaHtml = Object.entries(appointmentsGroupedByDate).map(([date, apps]) => `
-                <h3 class="text-lg font-semibold text-gray-700 mt-4 mb-2">${date}</h3>
-                <div class="space-y-3">
-                    ${apps.map(app => `
-                        <div onclick="showAppointmentModal('${app.id}')" class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-indigo-500 flex justify-between items-center hover:shadow-md transition cursor-pointer">
-                            <div>
-                                <div class="font-bold text-gray-800">${app.time} - ${app.patientName}</div>
-                                <div class="text-sm text-gray-500">${app.type}</div>
-                                <a href="${app.meetLink}" target="_blank" class="text-xs text-indigo-500 hover:text-indigo-700 flex items-center mt-1"><i data-lucide="link" class="w-3 h-3 mr-1"></i> Link (Agenda)</a>
-                            </div>
-                            <div class="text-xs font-semibold px-2 py-1 rounded-full ${app.status === 'Completed' ? 'text-green-600 bg-green-100' : 'text-yellow-600 bg-yellow-100'}">${app.status === 'Completed' ? 'Concluída' : 'Agendada'}</div>
+            const agendaHtml = Object.keys(appointmentsGroupedByDate).map(dateKey => {
+                const appointmentList = appointmentsGroupedByDate[dateKey].map(app => `
+                    <div onclick="showAppointmentModal('${app.id}')" class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-indigo-500 flex justify-between items-center hover:shadow-md transition cursor-pointer">
+                        <div>
+                            <div class="font-bold text-gray-800">${app.patientName}</div>
+                            <div class="text-sm text-gray-500">${app.time} - ${app.type}</div>
                         </div>
-                    `).join('')}
-                </div>
-            `).join('');
+                        <div class="text-xs font-semibold px-2 py-1 rounded-full ${app.status === 'Completed' ? 'text-green-600 bg-green-100' : 'text-yellow-600 bg-yellow-100'}">${app.status === 'Completed' ? 'Concluída' : 'Agendada'}</div>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="space-y-2">
+                        <h3 class="text-lg font-semibold text-gray-700 capitalize">${dateKey}</h3>
+                        ${appointmentList}
+                    </div>
+                `;
+            }).join('');
+
 
             return `
-                <div class="p-4">
-                    <div class="flex justify-between items-center mb-6">
-                        <h1 class="text-2xl font-bold text-gray-800">Agenda de Consultas</h1>
-                        <button onclick="showAppointmentModal()" class="p-2 bg-indigo-500 text-white rounded-full shadow-md hover:bg-indigo-600 transition">
-                            <i data-lucide="plus" class="w-6 h-6"></i>
+                <div class="p-4 space-y-6">
+                    <h1 class="text-2xl font-bold text-gray-800">Agenda de Atendimentos (${state.appointments.length})</h1>
+                    <div class="flex justify-between items-center">
+                         <button onclick="showAppointmentModal()" class="p-3 bg-indigo-500 text-white rounded-xl shadow-md hover:bg-indigo-600 transition text-sm font-semibold flex items-center space-x-2">
+                            <i data-lucide="plus" class="w-5 h-5"></i>
+                            <span>Novo Agendamento</span>
+                        </button>
+                        <button onclick="navigateTo('patients')" class="text-sm text-gray-600 hover:text-indigo-600 font-medium flex items-center">
+                            Ver por Paciente <i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>
                         </button>
                     </div>
 
                     <div class="bg-indigo-50 p-3 rounded-lg flex justify-around text-sm font-medium mb-4">
-                        <button class="text-indigo-600 font-bold border-b-2 border-indigo-600 pb-1">Próximos</button>
-                        <button data-view="patients" class="text-gray-500 hover:text-indigo-600">Pacientes</button>
+                        <button class="text-indigo-600 font-bold border-b-2 border-indigo-600 pb-1">Semana</button>
+                        <button class="text-gray-500 hover:text-indigo-600">Mês</button>
+                        <button class="text-gray-500 hover:text-indigo-600">Paciente</button>
                     </div>
 
                     ${agendaHtml || '<p class="text-center text-gray-500 bg-gray-50 p-4 rounded-lg">Nenhuma consulta na agenda.</p>'}
@@ -887,30 +804,28 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
 
         const renderFinance = () => {
             const currentMonth = new Date().toISOString().substring(0, 7);
-            const monthlyRecords = state.finances.filter(f => f.date && f.date.substring(0, 7) === currentMonth);
+            const monthlyRecords = state.finances
+                .filter(f => f.date && f.date.substring(0, 7) === currentMonth)
+                .sort((a, b) => new Date(b.date) - new Date(a.date)); // Mais recente primeiro
             
             const totalIncome = monthlyRecords
                 .filter(f => f.type === 'income')
                 .reduce((sum, f) => sum + f.amount, 0);
-            
             const totalExpense = monthlyRecords
                 .filter(f => f.type === 'expense')
                 .reduce((sum, f) => sum + f.amount, 0);
-            
             const balance = totalIncome - totalExpense;
 
-            const financeList = monthlyRecords
-                .sort((a, b) => new Date(b.date) - new Date(a.date)) // Mais recente primeiro
-                .map(f => `
+            const financeList = monthlyRecords.map(f => `
                 <div class="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center border-l-4 ${f.type === 'income' ? 'border-green-500' : 'border-red-500'}">
                     <div>
                         <div class="font-bold text-gray-800">${f.description}</div>
                         <div class="text-sm text-gray-500">${new Date(f.date).toLocaleDateString('pt-BR')}</div>
                     </div>
-                    <div class="font-semibold ${f.type === 'income' ? 'text-green-600' : 'text-red-600'}">
+                    <div class="font-semibold ${f.type === 'income' ? 'text-green-600' : 'text-red-600'} flex items-center">
                         ${f.type === 'income' ? '+' : '-'} ${formatCurrency(f.amount)}
                         <button onclick="showDeleteConfirmation('finance', '${f.id}')" class="ml-2 text-gray-400 hover:text-red-500 transition">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                         </button>
                     </div>
                 </div>
@@ -918,90 +833,63 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
 
             return `
                 <div class="p-4 space-y-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h1 class="text-2xl font-bold text-gray-800">Gestão Financeira</h1>
-                        <button onclick="showFinanceModal()" class="p-2 bg-indigo-500 text-white rounded-full shadow-md hover:bg-indigo-600 transition">
-                            <i data-lucide="plus" class="w-6 h-6"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">Gestão Financeira (${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })})</h1>
+
+                    <div class="bg-indigo-500 text-white p-5 rounded-xl shadow-lg">
+                        <div class="flex justify-between items-center mb-3">
+                            <span class="text-sm font-medium">Balanço do Mês:</span>
+                            <span class="text-xl font-extrabold ${balance >= 0 ? 'text-green-300' : 'text-red-300'}">${formatCurrency(balance)}</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 border-t border-indigo-400 pt-3">
+                            <div class="text-center">
+                                <p class="text-xs text-indigo-200">Receitas</p>
+                                <p class="font-bold text-green-300">${formatCurrency(totalIncome)}</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-xs text-indigo-200">Despesas</p>
+                                <p class="font-bold text-red-300">${formatCurrency(totalExpense)}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-semibold text-gray-700">Transações Recentes</h2>
+                        <button onclick="showFinanceModal()" class="p-3 bg-green-500 text-white rounded-xl shadow-md hover:bg-green-600 transition text-sm font-semibold flex items-center space-x-2">
+                            <i data-lucide="plus" class="w-5 h-5"></i>
+                            <span>Nova Transação</span>
                         </button>
                     </div>
 
-                    <div class="bg-white p-5 rounded-xl shadow-lg border border-gray-100 grid grid-cols-3 gap-4 text-center">
-                        <div>
-                            <div class="text-2xl font-extrabold text-green-600">${formatCurrency(totalIncome)}</div>
-                            <div class="text-xs text-gray-500 mt-1">Total Receita Mês</div>
-                        </div>
-                        <div>
-                            <div class="text-2xl font-extrabold text-red-600">${formatCurrency(totalExpense)}</div>
-                            <div class="text-xs text-gray-500 mt-1">Total Despesa Mês</div>
-                        </div>
-                        <div>
-                            <div class="text-2xl font-extrabold ${balance >= 0 ? 'text-blue-600' : 'text-red-600'}">${formatCurrency(balance)}</div>
-                            <div class="text-xs text-gray-500 mt-1">Saldo Mês</div>
-                        </div>
-                    </div>
-
-                    <h2 class="text-xl font-semibold text-gray-700 pt-3">Registros de ${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2>
                     <div class="space-y-3">
-                        ${financeList || '<p class="text-center text-gray-500 bg-gray-50 p-4 rounded-lg">Nenhum registro financeiro neste mês.</p>'}
+                        ${financeList || '<p class="text-center text-gray-500 bg-gray-50 p-4 rounded-lg">Nenhuma transação registrada neste mês.</p>'}
                     </div>
                 </div>
             `;
         };
 
+        // Renderização de lista simples para Medicações (exemplo de outra view)
         const renderMedicationList = () => {
-            // Placeholder para a lista de medicações (não implementada na lógica de dados)
             return `
-                <div class="p-4">
-                    <h1 class="text-2xl font-bold text-gray-800 mb-6">Lista de Documentos</h1>
-                    <div class="bg-white p-6 rounded-xl shadow-lg">
-                        <p class="text-gray-500">Esta seção listaria todos os documentos gerados e salvos no Storage (requer uma nova renderização de coleção).</p>
-                        <p class="text-sm text-gray-400 mt-2">Atualmente, você pode gerá-los na tela de detalhes do paciente.</p>
-                    </div>
+                 <div class="p-4 space-y-4">
+                    <h1 class="text-2xl font-bold text-gray-800">Medicamentos/Psicofármacos (Simulação)</h1>
+                    <p class="text-gray-600">Esta seção permite o gerenciamento rápido dos medicamentos que seus pacientes estão utilizando.</p>
+                    <div class="bg-yellow-50 p-4 rounded-xl text-yellow-800">Funcionalidade em desenvolvimento...</div>
+                    <button onclick="navigateTo('dashboard')" class="p-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition">Voltar para o Dashboard</button>
                 </div>
             `;
         };
 
-        // --- MODAL FUNCTIONS (KEPT INLINE FOR SIMPLICITY) ---
 
-        // Helper para mostrar o modal
-        const showModal = (content, title = 'Detalhes', id = 'general-modal') => {
-            const modal = document.getElementById(id);
-            const modalContent = id === 'general-modal' ? document.getElementById('general-modal-content') : document.getElementById('confirmation-modal-content');
-            const modalTitle = id === 'general-modal' ? document.getElementById('general-modal-title') : document.getElementById('confirmation-modal-title');
-            
-            if (modalTitle) modalTitle.textContent = title;
-            if (modalContent) modalContent.innerHTML = content;
-            
-            modal.classList.remove('hidden', 'opacity-0');
-            modal.classList.add('opacity-100');
-            // Re-run event listeners for any new content inside the modal
-            lucide.createIcons();
-            attachEventListeners(); 
-        };
-
-        const closeModal = (id = 'general-modal') => {
-            const modal = document.getElementById(id);
-            if (modal) {
-                modal.classList.remove('opacity-100');
-                modal.classList.add('opacity-0');
-                setTimeout(() => {
-                    modal.classList.add('hidden');
-                }, 300);
-            }
-        };
+        // --- MODAL FUNCTIONS (UI/UX) ---
 
         // Modal: Appointment (Agendar/Editar Consulta)
         window.showAppointmentModal = (appointmentId = null, patientId = null) => {
             const app = appointmentId ? state.appointments.find(a => a.id === appointmentId) : null;
             const title = app ? 'Editar/Reagendar Consulta' : 'Nova Consulta';
-            
             const defaultDate = app ? app.date : new Date().toISOString().substring(0, 10);
             const defaultTime = app ? app.time : '09:00';
             const defaultType = app ? app.type : 'Online';
-
-            const patientOptions = state.patients.map(p => 
-                `<option value="${p.id}" ${p.id === (app?.patientId || patientId) ? 'selected' : ''}>${p.fullName}</option>`
-            ).join('');
+            const patientOptions = state.patients.map(p => `<option value="${p.id}" ${p.id === (app?.patientId || patientId) ? 'selected' : ''}>${p.fullName}</option>` ).join('');
 
             const content = `
                 <form id="appointment-form" data-app-id="${appointmentId || ''}" class="space-y-4">
@@ -1025,25 +913,21 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
                     <div class="space-y-2">
                         <label for="app-type" class="block text-sm font-medium text-gray-700">Tipo de Consulta <span class="text-red-500">*</span></label>
                         <select id="app-type" name="type" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                            <option value="Online" ${defaultType === 'Online' ? 'selected' : ''}>Online</option>
+                            <option value="Online" ${defaultType === 'Online' ? 'selected' : ''}>Online (Vídeo)</option>
                             <option value="Presencial" ${defaultType === 'Presencial' ? 'selected' : ''}>Presencial</option>
+                            <option value="Outro" ${defaultType === 'Outro' ? 'selected' : ''}>Outro</option>
                         </select>
                     </div>
+                    
                     <div class="space-y-2">
-                        <label for="app-notes" class="block text-sm font-medium text-gray-700">Notas</label>
+                        <label for="app-notes" class="block text-sm font-medium text-gray-700">Notas Adicionais</label>
                         <textarea id="app-notes" name="notes" rows="2" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">${app?.notes || ''}</textarea>
                     </div>
-                    ${app?.meetLink ? `
-                        <p class="text-xs text-gray-500">Link do Google Agenda: <a href="${app.meetLink}" target="_blank" class="text-indigo-500 hover:text-indigo-700 font-semibold">Clique para Gerar Link do Meet</a></p>
-                    ` : ''}
+
                     <button type="submit" class="w-full p-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition">
-                        ${app ? 'Salvar Alterações/Reagendar' : 'Agendar Consulta'}
+                        ${app ? 'Salvar Alterações' : 'Agendar Consulta'}
                     </button>
-                    ${app ? `
-                        <button type="button" onclick="showDeleteConfirmation('appointment', '${app.id}')" class="w-full p-3 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition mt-2">
-                            Cancelar Consulta
-                        </button>
-                    ` : ''}
+                    ${app ? `<button type="button" onclick="showDeleteConfirmation('appointment', '${app.id}')" class="w-full p-3 bg-red-500 text-white rounded-xl font-semibold mt-2 hover:bg-red-600 transition">Cancelar Consulta</button>` : ''}
                 </form>
             `;
             showModal(content, title);
@@ -1053,12 +937,9 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
         window.showRecordModal = async (appointmentId, patientId) => {
             const patient = getPatientById(patientId);
             if (!patient) return showMessage('Paciente não encontrado.', 'error');
-
-            showLoading('Buscando registro...');
             const recordRef = doc(db, privatePath('records'), appointmentId);
             const recordSnap = await getDoc(recordRef);
             const record = recordSnap.exists() ? recordSnap.data() : null;
-            hideLoading();
 
             const title = `Registro - ${patient.fullName} (${formatDateTime(new Date())})`;
             const content = `
@@ -1078,20 +959,18 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
                     <button type="submit" class="w-full p-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition">
                         Salvar Registro de Atendimento
                     </button>
-                    ${record ? `<p class="text-xs text-center text-gray-500 mt-2">Última atualização: ${formatDateTime(record.updatedAt || record.createdAt)}</p>` : ''}
+                    ${record ? `<p class="text-xs text-center text-gray-500 mt-2">Última atualização: ${formatDateTime(record.updatedAt)}</p>` : ''}
                 </form>
             `;
             showModal(content, title);
         };
 
-        // Modal: Finance (Registro de Transação)
-        window.showFinanceModal = (recordId = null) => {
-            const record = recordId ? state.finances.find(f => f.id === recordId) : null;
-            const title = record ? 'Editar Transação' : 'Nova Transação Financeira';
+        // Modal: Finance (Registro Financeiro)
+        window.showFinanceModal = (record = null) => {
             const isEdit = !!record;
-            
+            const title = isEdit ? 'Editar Transação' : 'Nova Transação Financeira';
             const content = `
-                <form id="finance-form" data-record-id="${recordId || ''}" class="space-y-4">
+                <form id="finance-form" data-record-id="${record?.id || ''}" class="space-y-4">
                     <div class="space-y-2">
                         <label for="finance-type" class="block text-sm font-medium text-gray-700">Tipo <span class="text-red-500">*</span></label>
                         <select id="finance-type" name="type" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
@@ -1131,33 +1010,32 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
                         <label for="doc-type" class="block text-sm font-medium text-gray-700">Tipo de Documento <span class="text-red-500">*</span></label>
                         <select id="doc-type" name="docType" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
                             <option value="">Selecione...</option>
-                            <option value="AtestadoInaptidao">Atestado de Inaptidão</option>
                             <option value="DeclaracaoAcompanhamento">Declaração de Acompanhamento</option>
-                            <option value="ReceitaSimples">Receita Simples</option>
+                            <option value="AtestadoInaptidao">Atestado de Inaptidão</option>
+                            <option value="ReceitaSimples">Receita Simples (Psicofármacos)</option>
                         </select>
                     </div>
                     <div class="space-y-2">
-                        <label for="doc-content" class="block text-sm font-medium text-gray-700">Conteúdo do Documento (Edite aqui)</label>
-                        <textarea id="doc-content" name="docContent" rows="10" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 doc-editor-area">
-                            Prezado(a), escreva o conteúdo do documento aqui.
-                        </textarea>
+                        <label for="doc-content" class="block text-sm font-medium text-gray-700">Conteúdo do Documento</label>
+                        <textarea id="doc-content" name="docContent" rows="8" class="text-area-custom w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="O conteúdo será preenchido automaticamente com base no tipo selecionado."></textarea>
                     </div>
+
                     <button type="submit" class="w-full p-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition">
-                        Gerar e Salvar Documento (PDF)
+                        Gerar PDF e Salvar
                     </button>
-                    <button type="button" onclick="simulatedWhatsAppSend('${patientName}')" class="w-full p-3 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition mt-2">
-                        <i data-lucide="whatsapp" class="w-5 h-5 mr-2 inline-block"></i> Enviar por WhatsApp (Simulado)
+                    <button type="button" onclick="simulatedWhatsAppSend('${patientName}')" class="w-full p-3 bg-green-500 text-white rounded-xl font-semibold mt-2 hover:bg-green-600 transition flex items-center justify-center space-x-2">
+                        <i data-lucide="send" class="w-5 h-5"></i>
+                        <span>Simular Envio por WhatsApp</span>
                     </button>
                 </form>
             `;
             showModal(content, title);
-            
-            // Populate content based on type selection (helper logic)
-            document.getElementById('doc-type').addEventListener('change', (e) => {
+
+            // Adiciona listener para preenchimento automático
+            document.getElementById('doc-type')?.addEventListener('change', (e) => {
                 const type = e.target.value;
                 const textarea = document.getElementById('doc-content');
-                let newContent = `Prezado(a), edite o conteúdo do documento ${type} aqui.`;
-
+                let newContent = '';
                 if (type === 'ReceitaSimples') {
                     newContent = `RECEITA SIMPLES\n\n- Medicamento: [Nome do Remédio] - Dosagem: [X mg]\n- Frequência: [X vezes ao dia]\n\nObservações: [Informações Adicionais]`;
                 } else if (type === 'AtestadoInaptidao') {
@@ -1192,37 +1070,186 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
             showModal(content, title, 'confirmation-modal');
         };
 
+        // --- ATTACH EVENT LISTENERS ---
+        const attachEventListeners = () => {
+            // Patient Form Submit
+            document.getElementById('patient-form')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const patientId = form.id.value || null;
+                const patientData = {
+                    fullName: form.fullName.value,
+                    age: form.age.value ? parseInt(form.age.value) : null,
+                    contacts: {
+                        whatsapp: form.whatsapp.value,
+                        email: form.email.value,
+                    },
+                    address: form.address.value,
+                    clinicalHistory: form.clinicalHistory.value,
+                    medications: form.medications.value,
+                    observations: form.observations.value,
+                };
+                await savePatient(patientData, patientId);
+                navigateTo('patients');
+            });
+
+            // Appointment Form Submit
+            document.getElementById('appointment-form')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const appointmentId = form.getAttribute('data-app-id') || null;
+                const appointmentData = {
+                    patientId: form.patientId.value,
+                    date: form.date.value,
+                    time: form.time.value,
+                    type: form.type.value,
+                    notes: form.notes.value,
+                };
+                await saveAppointment(appointmentData, appointmentId);
+                closeModal();
+                navigateTo('agenda');
+            });
+            
+            // Record Form Submit
+            document.getElementById('record-form')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const appointmentId = form.getAttribute('data-app-id');
+                const patientId = form.getAttribute('data-patient-id');
+                const recordData = {
+                    queixaPrincipal: form.queixaPrincipal.value,
+                    assuntosDiscutidos: form.assuntosDiscutidos.value,
+                    tarefasSugestoes: form.tarefasSugestoes.value,
+                };
+                await saveRecord(recordData, appointmentId, patientId);
+                closeModal();
+            });
+
+            // Finance Form Submit
+            document.getElementById('finance-form')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const financeData = {
+                    type: form.type.value,
+                    description: form.description.value,
+                    amount: form.amount.value,
+                    date: form.date.value,
+                };
+                await saveFinanceRecord(financeData);
+                closeModal();
+                navigateTo('finance');
+            });
+
+            // Document Form Submit (Simulation of PDF Generation and Storage)
+            document.getElementById('document-form')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const patientId = form.getAttribute('data-patient-id');
+                const patientName = form.getAttribute('data-patient-name');
+                const docType = form.docType.value;
+                const docContent = form.docContent.value;
+
+                if (!docType || !docContent) {
+                    return showMessage('Selecione o tipo e preencha o conteúdo do documento.', 'error');
+                }
+
+                showLoading('Gerando PDF e fazendo upload...');
+
+                // --- PDF Generation Simulation (A real application would use jsPDF or similar) ---
+                const pdfContent = `
+--- ${docType.toUpperCase().replace(/SIMPLES|ACOMPANHAMENTO/g, '').replace('ATTESTADO', 'ATESTADO')} ---
+
+Paciente: ${patientName}
+Conteúdo: 
+${docContent}
+
+_________________________
+Assinatura do Psicólogo(a)
+
+Data: ${new Date().toLocaleDateString('pt-BR')}
+`;
+                // Simple Base64 encoding of the text content for storage simulation
+                const pdfBase64 = btoa(pdfContent); 
+                const downloadURL = await uploadDocument(`${docType}_${patientName}`, pdfBase64);
+                
+                if (downloadURL) {
+                    // Salvar referência no Firestore (Documents Collection)
+                    await addDoc(collection(db, privatePath('documents')), {
+                        patientId,
+                        patientName,
+                        type: docType,
+                        contentSummary: docContent.substring(0, 100) + '...',
+                        fileUrl: downloadURL,
+                        createdAt: serverTimestamp(),
+                        userId: userId
+                    });
+                    
+                    showMessage('Documento gerado, salvo no Storage e referenciado no Firestore!', 'success');
+                    closeModal();
+                }
+
+                hideLoading();
+            });
+
+            // Confirmation Delete Button
+            document.getElementById('confirm-delete-btn')?.addEventListener('click', async (e) => {
+                const dataType = e.target.getAttribute('data-type');
+                const id = e.target.getAttribute('data-id');
+                if (dataType === 'patient') {
+                    await deletePatient(id);
+                } else if (dataType === 'appointment') {
+                    await deleteAppointment(id);
+                } else if (dataType === 'finance') {
+                    await deleteFinanceRecord(id);
+                }
+                closeModal('confirmation-modal');
+            });
+        };
+
         // --- MAIN APP INIT ---
         window.onload = () => {
             initializeFirebase();
-
-            // Expor funções para uso no HTML inline (para Modals e outros elementos não refatorados)
+            // Expor funções para uso no HTML inline
             window.navigateTo = navigateTo;
             window.toggleSidebar = toggleSidebar;
-            window.closeSidebar = closeSidebar;
             window.closeModal = closeModal;
             window.showAppointmentModal = showAppointmentModal;
             window.showRecordModal = showRecordModal;
             window.showFinanceModal = showFinanceModal;
             window.showDocumentModal = showDocumentModal;
             window.showDeleteConfirmation = showDeleteConfirmation;
+            window.openWhatsAppChat = openWhatsAppChat;
+            window.handleLogout = handleLogout; // Nova função exposta
+            // window.toggleAuthMode já está exposta.
         };
+
     </script>
+
     <style>
-        /* Custom styles */
-        .doc-editor-area {
-            min-height: 200px; 
-            font-family: monospace; 
+        .sidebar-item-active {
+            background-color: #eef2ff; /* indigo-50 */
+            color: #4f46e5; /* indigo-600 */
+            font-weight: 600;
+        }
+        .text-area-custom {
+            height: 200px;
+            font-family: monospace;
             white-space: pre-wrap;
         }
     </style>
+
 </head>
 <body class="min-h-screen">
     
-    <div id="loading-overlay" class="fixed inset-0 bg-indigo-50/80 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+    <div id="auth-overlay" class="fixed inset-0 bg-gray-100 flex items-center justify-center z-50 hidden">
+        <div id="auth-content" class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+            </div>
+    </div>
+    
+    <div id="loading-overlay" class="fixed inset-0 bg-indigo-50/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 transition-opacity duration-300 opacity-0">
         <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-600"></div>
-        <p class="mt-4 text-indigo-700 font-semibold">Carregando Plataforma...</p>
-        <p class="text-sm text-indigo-500">Autenticando com Firebase.</p>
+        <p id="loading-text-main" class="mt-4 text-indigo-700 font-semibold">Carregando Plataforma...</p>
+        <p id="loading-text-sub" class="text-sm text-indigo-500">Autenticando com Firebase.</p>
     </div>
 
     <div id="message-box" class="opacity-0 transition-opacity duration-300 fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50"></div>
@@ -1236,73 +1263,65 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
                 </h2>
             </div>
             <nav class="flex-grow space-y-2">
-                <button data-view="dashboard" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-indigo-50 transition font-medium">
+                <button onclick="navigateTo('dashboard')" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-indigo-50 transition font-medium">
                     <i data-lucide="layout-dashboard" class="w-5 h-5 mr-3"></i> Dashboard
                 </button>
-                <button data-view="patients" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-indigo-50 transition font-medium">
+                <button onclick="navigateTo('patients')" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-indigo-50 transition font-medium">
                     <i data-lucide="users" class="w-5 h-5 mr-3"></i> Pacientes
                 </button>
-                <button data-view="agenda" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-indigo-50 transition font-medium">
+                <button onclick="navigateTo('agenda')" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-indigo-50 transition font-medium">
                     <i data-lucide="calendar" class="w-5 h-5 mr-3"></i> Agenda
                 </button>
-                <button data-view="finance" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-indigo-50 transition font-medium">
+                <button onclick="navigateTo('finance')" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-indigo-50 transition font-medium">
                     <i data-lucide="wallet" class="w-5 h-5 mr-3"></i> Financeiro
                 </button>
-                <button data-view="medications" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-indigo-50 transition font-medium">
-                    <i data-lucide="pill" class="w-5 h-5 mr-3"></i> Documentos/Docs
-                </button>
             </nav>
-            <div class="flex-shrink-0 pt-4 border-t border-gray-100">
-                <button onclick="auth.signOut();" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-red-50 hover:text-red-600 transition font-medium">
+            <div class="mt-auto pt-4 border-t">
+                <button onclick="handleLogout()" class="w-full flex items-center p-3 rounded-xl text-red-500 hover:bg-red-50 transition font-medium">
                     <i data-lucide="log-out" class="w-5 h-5 mr-3"></i> Sair
                 </button>
             </div>
         </div>
 
-        <div class="flex-1 flex flex-col overflow-y-auto lg:ml-64 bg-gray-50">
-            <header class="sticky top-0 bg-white shadow-md p-4 flex items-center justify-between z-20">
-                <button onclick="toggleSidebar()" class="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-full">
+        <div class="flex-1 lg:ml-64 bg-gray-50 overflow-y-auto">
+            <header class="lg:hidden bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-20">
+                <button onclick="toggleSidebar()" class="p-2 text-indigo-600 hover:bg-gray-100 rounded-full">
                     <i data-lucide="menu" class="w-6 h-6"></i>
                 </button>
-                <h1 class="text-xl font-bold text-gray-800">PsychoPro</h1>
-                <div class="flex items-center space-x-3">
-                    <button class="p-2 text-gray-600 hover:bg-gray-100 rounded-full">
-                        <i data-lucide="bell" class="w-6 h-6"></i>
-                    </button>
-                    <div class="w-8 h-8 bg-indigo-500 text-white rounded-full flex items-center justify-center font-bold text-sm">P</div>
-                </div>
+                <h1 class="text-xl font-bold text-indigo-600">PsychoPro</h1>
+                <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">PS</div>
             </header>
 
-            <main id="app-content" class="flex-1 pb-20"></main>
+            <main id="app-content" class="p-0 pb-20"></main>
 
-            <nav class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-2xl p-2 z-30">
-                <div class="flex justify-around">
-                    <button data-view="dashboard" class="text-indigo-600 flex flex-col items-center p-2">
+            <div class="fixed bottom-0 left-0 right-0 lg:hidden bg-white border-t shadow-2xl z-20">
+                <div class="flex justify-around items-center h-16">
+                    <button onclick="navigateTo('dashboard')" class="text-indigo-600 flex flex-col items-center p-2">
                         <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
                         <span class="text-xs">Início</span>
                     </button>
-                    <button data-view="patients" class="text-gray-500 hover:text-indigo-600 flex flex-col items-center p-2">
+                    <button onclick="navigateTo('patients')" class="text-gray-500 hover:text-indigo-600 flex flex-col items-center p-2">
                         <i data-lucide="users" class="w-6 h-6"></i>
                         <span class="text-xs">Pacientes</span>
                     </button>
                     <button onclick="showAppointmentModal()" class="p-3 bg-indigo-500 text-white rounded-full shadow-lg -mt-4 transform transition-transform hover:scale-105">
                         <i data-lucide="calendar-plus" class="w-7 h-7"></i>
                     </button>
-                    <button data-view="agenda" class="text-gray-500 hover:text-indigo-600 flex flex-col items-center p-2">
+                    <button onclick="navigateTo('agenda')" class="text-gray-500 hover:text-indigo-600 flex flex-col items-center p-2">
                         <i data-lucide="calendar" class="w-6 h-6"></i>
                         <span class="text-xs">Agenda</span>
                     </button>
-                    <button data-view="finance" class="text-gray-500 hover:text-indigo-600 flex flex-col items-center p-2">
-                        <i data-lucide="wallet" class="w-6 h-6"></i>
-                        <span class="text-xs">Financeiro</span>
+                    <button onclick="handleLogout()" class="text-gray-500 hover:text-red-600 flex flex-col items-center p-2">
+                        <i data-lucide="log-out" class="w-6 h-6"></i>
+                        <span class="text-xs">Sair</span>
                     </button>
                 </div>
-            </nav>
+            </div>
         </div>
     </div>
 
     <div id="general-modal" onclick="if(event.target.id === 'general-modal') closeModal()" class="hidden fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center transition-opacity duration-300 opacity-0">
-        <div class="bg-white rounded-lg sm:rounded-xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto transform transition-all duration-300 translate-y-0 sm:translate-y-0">
+        <div class="bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto transform transition-all duration-300 translate-y-0 sm:translate-y-0">
             <div class="flex justify-between items-center p-5 border-b sticky top-0 bg-white z-10">
                 <h3 id="general-modal-title" class="text-xl font-bold text-gray-800">Modal Title</h3>
                 <button onclick="closeModal()" class="p-2 text-gray-500 hover:bg-gray-100 rounded-full">
@@ -1318,7 +1337,7 @@ Data: ${new Date().toLocaleDateString('pt-BR')} `;
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 transform transition-all duration-300">
             <h3 id="confirmation-modal-title" class="text-xl font-bold text-red-600 mb-4">Confirmar Ação</h3>
             <div id="confirmation-modal-content">
-                 </div>
+                </div>
         </div>
     </div>
 
