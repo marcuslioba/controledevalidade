@@ -3,1348 +3,1805 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PsychoPro | Gestão de Consultório</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // Imports para Autenticação E-mail/Senha
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        // Imports para Firestore (Banco de Dados)
-        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        // Imports para Storage (Arquivos/Documentos)
-        import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
-        
-        // --- CONFIGURAÇÃO FIREBASE (CORRIGIDA) ---
-        // Agora, o código usa diretamente a sua configuração fornecida.
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Mantido para compatibilidade
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // ** SUA CONFIGURAÇÃO FIREBASE INSERIDA AQUI **
-        const firebaseConfig = {
-            apiKey: "AIzaSyDTjGnO9D4fljHA0ucTBujw_n1PSAFatkE",
-            authDomain: "studio-873001119-21845.firebaseapp.com",
-            projectId: "studio-873001119-21845",
-            storageBucket: "studio-873001119-21845.firebasestorage.app",
-            messagingSenderId: "842279750292",
-            appId: "1:842279750292:web:62583e78f06ca68a6e0281"
-        };
-        // ------------------------------------------
-
-        let app, db, auth, storage, userId;
-        const state = {
-            currentView: 'dashboard',
-            patients: [],
-            appointments: [],
-            finances: [],
-            activePatient: null,
-            isAuthReady: false,
-            isRegisterMode: false 
-        };
-
-        // --- UTILS ---
-        
-        // Helper para formatar data e hora
-        const formatDateTime = (timestamp) => {
-            if (!timestamp) return 'N/A';
-            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-            return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
-                   date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        };
-
-        // Helper para formatar moeda
-        const formatCurrency = (amount) => {
-            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount);
-        };
-        
-        const showLoading = (text = 'Processando...') => {
-            const overlay = document.getElementById('loading-overlay');
-            document.getElementById('loading-text-main').textContent = text;
-            document.getElementById('loading-text-sub').textContent = '';
-            overlay.classList.remove('hidden', 'opacity-0');
-            setTimeout(() => overlay.classList.add('opacity-100'), 10);
-        };
-
-        const hideLoading = () => {
-            const overlay = document.getElementById('loading-overlay');
-            overlay.classList.remove('opacity-100');
-            setTimeout(() => {
-                 overlay.classList.add('hidden', 'opacity-0');
-                 document.getElementById('loading-text-sub').textContent = 'Autenticando com Firebase.'; // Reset sub text
-            }, 300);
-        };
-        
-        const showMessage = (text, type = 'info', duration = 3000) => {
-            const msgBox = document.getElementById('message-box');
-            msgBox.textContent = text;
-            msgBox.className = `p-3 rounded-lg shadow-xl text-white fixed bottom-20 left-1/2 transform -translate-x-1/2 transition-opacity duration-300 opacity-0 z-50`;
-            if (type === 'success') msgBox.classList.add('bg-green-600');
-            else if (type === 'error') msgBox.classList.add('bg-red-600');
-            else msgBox.classList.add('bg-blue-600');
-            setTimeout(() => {
-                msgBox.classList.remove('opacity-0');
-                msgBox.classList.add('opacity-100');
-            }, 10);
-            setTimeout(() => {
-                msgBox.classList.remove('opacity-100');
-                msgBox.classList.add('opacity-0');
-            }, duration);
-        };
-
-        // --- FIREBASE INITIALIZATION & AUTH ---
-
-        const privatePath = (collectionName) => `/artifacts/${appId}/users/${userId}/${collectionName}`;
-
-        const initializeFirebase = async () => {
-            showLoading('Inicializando o sistema...');
-            try {
-                // ** CORREÇÃO APLICADA: Inicializa com a configuração fornecida **
-                app = initializeApp(firebaseConfig);
-                
-                db = getFirestore(app);
-                auth = getAuth(app);
-                storage = getStorage(app);
-
-                // Monitora o estado de autenticação (user)
-                onAuthStateChanged(auth, (user) => {
-                    state.isAuthReady = true;
-                    
-                    const authOverlay = document.getElementById('auth-overlay');
-
-                    if (user) {
-                        userId = user.uid;
-                        console.log("Usuário autenticado:", userId);
-                        // Usuário logado: esconde a tela de login e inicia o carregamento dos dados
-                        authOverlay.classList.add('hidden'); 
-                        startDataListeners();
-                        renderApp(); // Renderiza a view principal (Dashboard)
-                        hideLoading();
-                    } else {
-                        console.log("Nenhum usuário autenticado. Exibindo tela de login.");
-                        userId = null;
-                        // Usuário deslogado: exibe a tela de login/cadastro
-                        authOverlay.classList.remove('hidden'); 
-                        renderLoginScreen();
-                        hideLoading();
-                    }
-                });
-                
-                // Tenta autenticação customizada se houver token (para ambientes Canvas)
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                }
-
-            } catch (error) {
-                console.error("Erro ao inicializar Firebase ou Autenticar:", error);
-                // Exibe uma mensagem mais clara em caso de erro de configuração/conexão
-                showMessage('Erro crítico: Falha ao conectar ao Firebase. Verifique sua configuração.', 'error', 10000);
-                hideLoading();
-            }
-        };
-
-        // --- HANDLERS DE AUTENTICAÇÃO ---
-        
-        const handleLogin = async (email, password) => {
-            showLoading('Entrando...');
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-                showMessage('Login realizado com sucesso!', 'success');
-            } catch (error) {
-                console.error("Erro no login:", error.code, error.message);
-                if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-                     showMessage('E-mail ou senha inválidos.', 'error');
-                } else {
-                     showMessage(`Erro ao tentar logar: ${error.code}.`, 'error');
-                }
-            } finally {
-                hideLoading();
-            }
-        };
-
-        const handleRegister = async (email, password) => {
-            showLoading('Criando conta...');
-            try {
-                await createUserWithEmailAndPassword(auth, email, password);
-                showMessage('Cadastro realizado com sucesso! Você está logado.', 'success');
-            } catch (error) {
-                console.error("Erro no cadastro:", error.code, error.message);
-                if (error.code === 'auth/email-already-in-use') {
-                    showMessage('Este e-mail já está em uso. Tente fazer login.', 'error');
-                } else if (error.code === 'auth/weak-password') {
-                    showMessage('Senha fraca. Use pelo menos 6 caracteres.', 'error');
-                } else {
-                    showMessage(`Erro ao tentar cadastrar: ${error.code}.`, 'error');
-                }
-            } finally {
-                hideLoading();
-            }
-        };
-
-        const handleLogout = async () => {
-            showLoading('Saindo...');
-            try {
-                await signOut(auth);
-                showMessage('Sessão encerrada com sucesso.', 'info');
-                // Limpa o estado da aplicação
-                state.patients = [];
-                state.appointments = [];
-                state.finances = [];
-                state.activePatient = null;
-                navigateTo('dashboard');
-            } catch (error) {
-                console.error("Erro ao sair:", error);
-                showMessage('Erro ao sair. Tente novamente.', 'error');
-            } finally {
-                hideLoading();
-            }
-        };
-
-        // Função para alternar entre Login e Cadastro na tela de autenticação
-        window.toggleAuthMode = (isRegister) => {
-            state.isRegisterMode = isRegister;
-            renderLoginScreen();
-        };
-
-        // --- FIREBASE DATA LISTENERS ---
-
-        const startDataListeners = () => {
-            if (!userId) return;
-
-            // 1. Patients Listener
-            onSnapshot(collection(db, privatePath('patients')), (snapshot) => {
-                state.patients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                console.log("Pacientes carregados:", state.patients.length);
-                renderView();
-            }, (error) => {
-                console.error("Erro ao ouvir pacientes:", error);
-            });
-
-            // 2. Appointments Listener
-            const qAppointments = query(
-                collection(db, privatePath('appointments')),
-                // Adicionar filtro para mostrar apenas consultas futuras + as de hoje (opcional, mas bom para otimizar)
-            );
-            onSnapshot(qAppointments, (snapshot) => {
-                state.appointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                console.log("Consultas carregadas:", state.appointments.length);
-                renderView();
-            }, (error) => {
-                console.error("Erro ao ouvir consultas:", error);
-            });
-
-            // 3. Finances Listener
-            onSnapshot(collection(db, privatePath('finances')), (snapshot) => {
-                state.finances = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                console.log("Registros financeiros carregados:", state.finances.length);
-                renderView();
-            }, (error) => {
-                console.error("Erro ao ouvir finanças:", error);
-            });
-            // Note: Records and Documents will be fetched on demand (e.g., in PatientDetail)
-        };
-
-        // --- CRUD OPERATIONS ---
-
-        const saveRecord = async (recordData, appointmentId, patientId) => {
-            if (!userId) return;
-            try {
-                // Atualiza o registro (cria se não existir, usa appointmentId como ID do documento)
-                await setDoc(doc(db, privatePath('records'), appointmentId), {
-                    ...recordData,
-                    patientId: patientId,
-                    updatedAt: serverTimestamp(),
-                    userId: userId
-                }, { merge: true });
-
-                // Marca a consulta como concluída
-                await updateDoc(doc(db, privatePath('appointments'), appointmentId), {
-                    status: 'Completed',
-                    updatedAt: serverTimestamp()
-                });
-
-                showMessage('Registro de atendimento salvo e consulta marcada como concluída!', 'success');
-            } catch (error) {
-                console.error("Erro ao salvar registro:", error);
-                showMessage('Erro ao salvar registro. Tente novamente.', 'error');
-            }
-        };
-
-        const savePatient = async (patientData, patientId = null) => {
-            if (!userId) return;
-            try {
-                if (patientId) {
-                    await updateDoc(doc(db, privatePath('patients'), patientId), patientData);
-                    showMessage('Paciente atualizado com sucesso!', 'success');
-                } else {
-                    await addDoc(collection(db, privatePath('patients')), {
-                        ...patientData,
-                        createdAt: serverTimestamp(),
-                        userId: userId
-                    });
-                    showMessage('Paciente cadastrado com sucesso!', 'success');
-                }
-            } catch (error) {
-                console.error("Erro ao salvar paciente:", error);
-                showMessage('Erro ao salvar paciente. Tente novamente.', 'error');
-            }
-        };
-        const deletePatient = async (patientId) => {
-            if (!userId) return;
-            try {
-                await deleteDoc(doc(db, privatePath('patients'), patientId));
-                showMessage('Paciente excluído com sucesso!', 'success');
-                navigateTo('patients');
-            } catch (error) {
-                console.error("Erro ao excluir paciente:", error);
-                showMessage('Erro ao excluir paciente. Tente novamente.', 'error');
-            }
-        };
-        const saveAppointment = async (appointmentData, appointmentId = null) => {
-            if (!userId) return;
-            try {
-                const meetLink = appointmentData.meetLink || generateGoogleMeetLink(); // Gerar Meet Link
-                const dataToSave = {
-                    ...appointmentData,
-                    meetLink,
-                    patientName: state.patients.find(p => p.id === appointmentData.patientId)?.fullName || 'Paciente Removido',
-                    updatedAt: serverTimestamp(),
-                    userId: userId
-                };
-                if (appointmentId) {
-                    await updateDoc(doc(db, privatePath('appointments'), appointmentId), dataToSave);
-                    showMessage('Consulta reagendada/atualizada com sucesso!', 'success');
-                } else {
-                    await addDoc(collection(db, privatePath('appointments')), {
-                        ...dataToSave,
-                        status: 'Scheduled',
-                        createdAt: serverTimestamp(),
-                    });
-                    showMessage('Consulta agendada com sucesso! Link do Meet gerado.', 'success');
-                }
-            } catch (error) {
-                console.error("Erro ao salvar consulta:", error);
-                showMessage('Erro ao salvar consulta. Tente novamente.', 'error');
-            }
-        };
-        const deleteAppointment = async (appointmentId) => {
-            if (!userId) return;
-            try {
-                await deleteDoc(doc(db, privatePath('appointments'), appointmentId));
-                showMessage('Consulta cancelada com sucesso.', 'success');
-            } catch (error) {
-                console.error("Erro ao excluir consulta:", error);
-                showMessage('Erro ao excluir consulta. Tente novamente.', 'error');
-            }
-        };
-        const saveFinanceRecord = async (recordData) => {
-            if (!userId) return;
-            try {
-                await addDoc(collection(db, privatePath('finances')), {
-                    ...recordData,
-                    amount: parseFloat(recordData.amount),
-                    date: recordData.date || new Date().toISOString().substring(0, 10),
-                    createdAt: serverTimestamp(),
-                    userId: userId
-                });
-                showMessage('Registro financeiro salvo com sucesso!', 'success');
-            } catch (error) {
-                console.error("Erro ao salvar registro financeiro:", error);
-                showMessage('Erro ao salvar registro financeiro. Tente novamente.', 'error');
-            }
-        };
-        const deleteFinanceRecord = async (recordId) => {
-            if (!userId) return;
-            try {
-                await deleteDoc(doc(db, privatePath('finances'), recordId));
-                showMessage('Registro financeiro excluído.', 'success');
-            } catch (error) {
-                console.error("Erro ao excluir registro financeiro:", error);
-                showMessage('Erro ao excluir registro financeiro. Tente novamente.', 'error');
-            }
-        };
-
-        // --- LOGIC AND HELPERS ---
-
-        const generateGoogleMeetLink = () => {
-            // Simulação de link do Meet (links reais requerem a API do Google Calendar)
-            const randomId = Math.random().toString(36).substring(2, 8);
-            return `https://meet.google.com/psico-${randomId}`;
-        };
-
-        const openWhatsAppChat = (number, message) => {
-            const url = `https://wa.me/${number.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-            window.open(url, '_blank');
-        };
-
-        const getPatientById = (id) => state.patients.find(p => p.id === id);
-        
-        const uploadDocument = async (fileName, pdfContentBase64) => {
-             if (!userId) return;
-            try {
-                // Simulação de upload de PDF para o Firebase Storage
-                const storageRefPath = `documents/${userId}/${fileName}_${Date.now()}.pdf`;
-                const storageReference = storageRef(storage, storageRefPath);
-
-                await uploadString(storageReference, pdfContentBase64, 'base64', {
-                    contentType: 'application/pdf'
-                });
-                const downloadURL = await getDownloadURL(storageReference);
-                console.log("PDF Uploaded, URL:", downloadURL);
-                return downloadURL;
-            } catch (error) {
-                console.error("Erro ao fazer upload do documento:", error);
-                showMessage('Erro ao gerar/salvar PDF. Verifique o console.', 'error');
-                return null;
-            }
-        };
-
-        // --- UI/UX & RENDERING ---
-
-        const navigateTo = (view, data = null) => {
-            if (view === 'patientDetail' && data) {
-                state.activePatient = data;
-                state.currentView = 'patientDetail';
-            } else {
-                state.currentView = view;
-                state.activePatient = null;
-            }
-            closeSidebar();
-            renderView();
-        };
-
-        const toggleSidebar = () => {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('-translate-x-full');
-        };
-
-        const closeSidebar = () => {
-            const sidebar = document.getElementById('sidebar');
-            if (!sidebar.classList.contains('-translate-x-full')) {
-                sidebar.classList.add('-translate-x-full');
-            }
-        };
-        
-        const showModal = (content, title, modalId = 'general-modal') => {
-            const modal = document.getElementById(modalId);
-            document.getElementById(`${modalId}-title`).textContent = title;
-            document.getElementById(`${modalId}-content`).innerHTML = content;
-            modal.classList.remove('hidden', 'opacity-0');
-            setTimeout(() => modal.classList.add('opacity-100'), 10);
-            lucide.createIcons(); // Render icons inside modal
-        };
-
-        const closeModal = (modalId = 'general-modal') => {
-            const modal = document.getElementById(modalId);
-            modal.classList.remove('opacity-100');
-            setTimeout(() => modal.classList.add('hidden', 'opacity-0'), 300);
-        };
-        
-        const renderApp = () => {
-             // Inicia a renderização do app principal (Dashboard) após o login
-             renderView();
-        };
-
-        const renderView = () => {
-            // Só renderiza se estiver autenticado. Se não estiver, a tela de login estará visível.
-            if (!userId) return; 
-
-            const content = document.getElementById('app-content');
-            const view = state.currentView;
-            let html = '';
-
-            // Atualiza o estado visual do sidebar
-            document.querySelectorAll('#sidebar nav button').forEach(btn => {
-                btn.classList.remove('sidebar-item-active');
-            });
-            const activeNav = document.querySelector(`#sidebar nav button[onclick="navigateTo('${view.startsWith('patient') ? 'patients' : view}')"]`);
-            if (activeNav) activeNav.classList.add('sidebar-item-active');
-
-
-            switch (view) {
-                case 'dashboard':
-                    html = renderDashboard();
-                    break;
-                case 'patients':
-                    html = renderPatientList();
-                    break;
-                case 'patientDetail':
-                    html = renderPatientDetail(state.activePatient);
-                    break;
-                case 'agenda':
-                    html = renderAgenda();
-                    break;
-                case 'finance':
-                    html = renderFinance();
-                    break;
-                case 'medications':
-                    html = renderMedicationList(); // Simple list view
-                    break;
-                case 'addPatient':
-                case 'editPatient':
-                    html = renderPatientForm(view === 'editPatient' ? state.activePatient : null);
-                    break;
-                default:
-                    html = `<div class="p-4 text-center text-gray-500">View ${view} not implemented.</div>`;
-            }
-
-            content.innerHTML = html;
-            // Re-render Lucide icons
-            lucide.createIcons();
-            attachEventListeners();
-        };
-
-        // --- FUNÇÃO PARA RENDERIZAR A TELA DE LOGIN/CADASTRO ---
-        const renderLoginScreen = () => {
-            const authContent = document.getElementById('auth-content');
-            
-            const title = state.isRegisterMode ? 'Crie Sua Conta' : 'Acesse Sua Conta';
-            const buttonText = state.isRegisterMode ? 'Cadastrar' : 'Entrar';
-            const switchText = state.isRegisterMode ? 'Já tem conta? Fazer Login' : 'Não tem conta? Cadastre-se';
-
-            authContent.innerHTML = `
-                <div class="p-8 w-full max-w-sm">
-                    <h1 class="text-3xl font-bold text-indigo-600 mb-2">PsychoPro</h1>
-                    <h2 class="text-xl font-semibold text-gray-700 mb-6">${title}</h2>
-                    
-                    <form id="auth-form" class="space-y-4">
-                        <div class="space-y-2">
-                            <label for="email" class="block text-sm font-medium text-gray-700">E-mail</label>
-                            <input type="email" id="auth-email" name="email" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="seu@email.com">
-                        </div>
-                        <div class="space-y-2">
-                            <label for="password" class="block text-sm font-medium text-gray-700">Senha</label>
-                            <input type="password" id="auth-password" name="password" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="Mínimo 6 caracteres">
-                        </div>
-                        
-                        <button type="submit" class="w-full p-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition">
-                            ${buttonText}
-                        </button>
-                    </form>
-
-                    <button onclick="toggleAuthMode(${!state.isRegisterMode})" class="w-full mt-4 text-sm text-indigo-600 hover:text-indigo-800 transition font-medium">
-                        ${switchText}
-                    </button>
-                </div>
-            `;
-
-            // Adiciona o listener para o formulário de autenticação
-            document.getElementById('auth-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = document.getElementById('auth-email').value;
-                const password = document.getElementById('auth-password').value;
-
-                if (state.isRegisterMode) {
-                    await handleRegister(email, password);
-                } else {
-                    await handleLogin(email, password);
-                }
-            });
-        };
-
-        // --- VIEW RENDER FUNCTIONS ---
-
-        const renderDashboard = () => {
-            const today = new Date().toISOString().substring(0, 10);
-            const nextAppointments = state.appointments
-                .filter(a => a.date >= today)
-                .sort((a, b) => new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time))
-                .slice(0, 5); // Próximas 5
-
-            const totalPatients = state.patients.length;
-            const patientAcronym = totalPatients > 0 ? state.patients[0].fullName.split(' ').map(n => n[0]).join('') : 'PP';
-            return `
-                <div class="p-4 space-y-6">
-                    <h1 class="text-3xl font-bold text-gray-800">Olá, Psicólogo!</h1>
-                    
-                    <div class="bg-white p-5 rounded-xl shadow-lg border border-gray-100 grid grid-cols-3 gap-4 text-center">
-                        <div>
-                            <div class="text-2xl font-extrabold text-indigo-600">${totalPatients}</div>
-                            <div class="text-xs text-gray-500 mt-1">Pacientes Ativos</div>
-                        </div>
-                        <div>
-                            <div class="text-2xl font-extrabold text-green-600">${nextAppointments.length}</div>
-                            <div class="text-xs text-gray-500 mt-1">Próximos Atendimentos</div>
-                        </div>
-                        <div>
-                            <div class="text-2xl font-extrabold text-blue-600">${formatCurrency(state.finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.amount, 0))}</div>
-                            <div class="text-xs text-gray-500 mt-1">Receita Total (Simulado)</div>
-                        </div>
-                    </div>
-
-                    <h2 class="text-xl font-semibold text-gray-700">Acesso Rápido</h2>
-                    <div class="grid grid-cols-2 gap-4">
-                        <button onclick="navigateTo('addPatient')" class="bg-indigo-500 text-white p-4 rounded-xl shadow-md hover:bg-indigo-600 transition flex items-center justify-center space-x-2">
-                            <i data-lucide="user-plus" class="w-6 h-6"></i>
-                            <span class="font-medium">Novo Paciente</span>
-                        </button>
-                        <button onclick="showAppointmentModal()" class="bg-green-500 text-white p-4 rounded-xl shadow-md hover:bg-green-600 transition flex items-center justify-center space-x-2">
-                            <i data-lucide="calendar-plus" class="w-6 h-6"></i>
-                            <span class="font-medium">Agendar Consulta</span>
-                        </button>
-                    </div>
-
-                    <h2 class="text-xl font-semibold text-gray-700 pt-4">Próximos Atendimentos</h2>
-                    <div class="space-y-3">
-                        ${nextAppointments.length > 0 ?
-                        nextAppointments.map(app => `
-                            <div onclick="showAppointmentModal('${app.id}')" class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-indigo-500 flex justify-between items-center hover:shadow-md transition cursor-pointer">
-                                <div>
-                                    <div class="font-bold text-gray-800">${app.patientName}</div>
-                                    <div class="text-sm text-gray-500">${new Date(app.date).toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })} às ${app.time}</div>
-                                </div>
-                                <div class="text-xs font-semibold px-2 py-1 rounded-full text-indigo-600 bg-indigo-100">${app.type}</div>
-                            </div>
-                        `).join('') : '<p class="text-center text-gray-500 bg-gray-50 p-4 rounded-lg">Nenhuma consulta agendada nos próximos dias.</p>'}
-                    </div>
-                </div>
-            `;
-        };
-        
-        const renderPatientList = () => {
-            const patientCards = state.patients.map(p => `
-                <div onclick="navigateTo('patientDetail', ${JSON.stringify(p).replace(/"/g, '&quot;')})" class="bg-white p-4 rounded-xl shadow-md flex items-center space-x-4 border-l-4 border-blue-500 hover:shadow-lg transition cursor-pointer">
-                    <div class="w-12 h-12 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full font-bold text-xl">${p.fullName.split(' ').map(n => n[0]).join('')}</div>
-                    <div class="flex-grow">
-                        <div class="font-semibold text-gray-800">${p.fullName}</div>
-                        <div class="text-sm text-gray-500">Idade: ${p.age || 'N/A'} | ${p.contacts.whatsapp}</div>
-                    </div>
-                    <i data-lucide="chevron-right" class="w-5 h-5 text-gray-400"></i>
-                </div>
-            `).join('');
-
-            return `
-                <div class="p-4">
-                    <div class="flex justify-between items-center mb-6">
-                        <h1 class="text-2xl font-bold text-gray-800">Pacientes (${state.patients.length})</h1>
-                        <button onclick="navigateTo('addPatient')" class="p-2 bg-indigo-500 text-white rounded-full shadow-md hover:bg-indigo-600 transition">
-                            <i data-lucide="plus" class="w-6 h-6"></i>
-                        </button>
-                    </div>
-                    <div class="space-y-3">
-                        ${patientCards || '<p class="text-center text-gray-500 bg-gray-50 p-4 rounded-lg">Nenhum paciente cadastrado.</p>'}
-                    </div>
-                </div>
-            `;
-        };
-
-        const renderPatientForm = (patient = null) => {
-            const isEdit = !!patient;
-            return `
-                <div class="p-4">
-                    <h1 class="text-2xl font-bold text-gray-800 mb-6">${isEdit ? 'Editar Paciente' : 'Novo Paciente'}</h1>
-                    <form id="patient-form" class="space-y-4 bg-white p-6 rounded-xl shadow-lg">
-                        <input type="hidden" name="id" value="${patient?.id || ''}">
-
-                        <div class="space-y-2">
-                            <label for="fullName" class="block text-sm font-medium text-gray-700">Nome Completo <span class="text-red-500">*</span></label>
-                            <input type="text" id="fullName" name="fullName" value="${patient?.fullName || ''}" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="space-y-2">
-                                <label for="age" class="block text-sm font-medium text-gray-700">Idade</label>
-                                <input type="number" id="age" name="age" value="${patient?.age || ''}" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                            </div>
-                            <div class="space-y-2">
-                                <label for="whatsapp" class="block text-sm font-medium text-gray-700">WhatsApp <span class="text-red-500">*</span></label>
-                                <input type="tel" id="whatsapp" name="whatsapp" value="${patient?.contacts?.whatsapp || ''}" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                            </div>
-                        </div>
-
-                        <div class="space-y-2">
-                            <label for="email" class="block text-sm font-medium text-gray-700">E-mail</label>
-                            <input type="email" id="email" name="email" value="${patient?.contacts?.email || ''}" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                        </div>
-                        <div class="space-y-2">
-                            <label for="address" class="block text-sm font-medium text-gray-700">Endereço (Opcional)</label>
-                            <input type="text" id="address" name="address" value="${patient?.address || ''}" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                        </div>
-
-                        <div class="space-y-2">
-                            <label for="clinicalHistory" class="block text-sm font-medium text-gray-700">Histórico Clínico</label>
-                            <textarea id="clinicalHistory" name="clinicalHistory" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">${patient?.clinicalHistory || ''}</textarea>
-                        </div>
-                        <div class="space-y-2">
-                            <label for="medications" class="block text-sm font-medium text-gray-700">Medicações Utilizadas</label>
-                            <textarea id="medications" name="medications" rows="2" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">${patient?.medications || ''}</textarea>
-                        </div>
-                        <div class="space-y-2">
-                            <label for="observations" class="block text-sm font-medium text-gray-700">Observações Importantes</label>
-                            <textarea id="observations" name="observations" rows="2" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">${patient?.observations || ''}</textarea>
-                        </div>
-
-                        <div class="flex space-x-4 pt-4">
-                            <button type="button" onclick="navigateTo('patients')" class="flex-1 p-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition">Cancelar</button>
-                            <button type="submit" class="flex-1 p-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition">
-                                ${isEdit ? 'Salvar Alterações' : 'Cadastrar Paciente'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            `;
-        };
-
-        const renderPatientDetail = (patient) => {
-            if (!patient) return `<div class="p-4 text-center text-red-500">Paciente não encontrado.</div>`;
-            // Filtrar Registros/Consultas do paciente
-            const patientAppointments = state.appointments
-                .filter(a => a.patientId === patient.id)
-                .sort((a, b) => new Date(b.date + ' ' + b.time) - new Date(a.date + ' ' + a.time)); // Mais recente primeiro
-
-            return `
-                <div class="p-4 space-y-6">
-                    <div class="flex items-center space-x-4 mb-4">
-                        <button onclick="navigateTo('patients')" class="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition">
-                            <i data-lucide="arrow-left" class="w-6 h-6 text-gray-600"></i>
-                        </button>
-                        <h1 class="text-2xl font-bold text-gray-800">${patient.fullName}</h1>
-                    </div>
-
-                    <div class="bg-white p-5 rounded-xl shadow-lg border border-gray-100 space-y-3">
-                        <div class="text-sm text-gray-500 flex items-center"><i data-lucide="cake" class="w-4 h-4 mr-2"></i> Idade: <span class="font-medium text-gray-700 ml-1">${patient.age || 'N/A'}</span></div>
-                        <div class="text-sm text-gray-500 flex items-center"><i data-lucide="mail" class="w-4 h-4 mr-2"></i> E-mail: <span class="font-medium text-gray-700 ml-1">${patient.contacts.email || 'N/A'}</span></div>
-                        <div class="text-sm text-gray-500 flex items-center"><i data-lucide="phone" class="w-4 h-4 mr-2"></i> WhatsApp: <span class="font-medium text-gray-700 ml-1">${patient.contacts.whatsapp || 'N/A'}</span></div>
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-3">
-                        <button onclick="navigateTo('editPatient', ${JSON.stringify(patient).replace(/"/g, '&quot;')})" class="p-3 bg-blue-500 text-white rounded-xl text-xs font-semibold hover:bg-blue-600 transition flex flex-col items-center">
-                            <i data-lucide="pencil" class="w-4 h-4 mb-1"></i> Editar
-                        </button>
-                        <button onclick="showAppointmentModal(null, '${patient.id}')" class="p-3 bg-green-500 text-white rounded-xl text-xs font-semibold hover:bg-green-600 transition flex flex-col items-center">
-                            <i data-lucide="calendar-plus" class="w-4 h-4 mb-1"></i> Agendar
-                        </button>
-                        <button onclick="showDocumentModal('${patient.id}', '${patient.fullName}')" class="p-3 bg-orange-500 text-white rounded-xl text-xs font-semibold hover:bg-orange-600 transition flex flex-col items-center">
-                            <i data-lucide="file-text" class="w-4 h-4 mb-1"></i> Documento
-                        </button>
-                    </div>
-
-                    <div class="bg-white p-5 rounded-xl shadow-lg space-y-4">
-                        <h3 class="text-lg font-semibold text-gray-700">Histórico Clínico</h3>
-                        <p class="text-sm text-gray-600 whitespace-pre-wrap">${patient.clinicalHistory || 'N/A'}</p>
-                        <h3 class="text-lg font-semibold text-gray-700 pt-3">Medicações e Obs.</h3>
-                        <p class="text-sm text-gray-600 whitespace-pre-wrap">${patient.medications || 'N/A'}</p>
-                        <p class="text-sm text-gray-600 whitespace-pre-wrap">${patient.observations || 'N/A'}</p>
-                    </div>
-
-                    <h2 class="text-xl font-semibold text-gray-700">Histórico de Atendimentos (${patientAppointments.length})</h2>
-                    <div class="space-y-3">
-                        ${patientAppointments.length > 0 ?
-                        patientAppointments.map(app => `
-                            <div onclick="showRecordModal('${app.id}', '${patient.id}')" class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-gray-400 flex justify-between items-center hover:shadow-md transition cursor-pointer">
-                                <div>
-                                    <div class="font-bold text-gray-800">Sessão de ${new Date(app.date).toLocaleDateString('pt-BR')}</div>
-                                    <div class="text-sm text-gray-500">${app.type} - ${app.time}</div>
-                                </div>
-                                <div class="text-xs font-semibold px-2 py-1 rounded-full ${app.status === 'Completed' ? 'text-green-600 bg-green-100' : 'text-yellow-600 bg-yellow-100'}">${app.status === 'Completed' ? 'Concluída' : 'Agendada'}</div>
-                            </div>
-                        `).join('') : '<p class="text-center text-gray-500 bg-gray-50 p-4 rounded-lg">Nenhum atendimento registrado.</p>'}
-                    </div>
-
-                    <button onclick="showDeleteConfirmation('patient', '${patient.id}')" class="w-full p-3 bg-red-500 text-white rounded-xl font-semibold mt-4 hover:bg-red-600 transition">
-                        Excluir Paciente Permanentemente
-                    </button>
-                </div>
-            `;
-        };
-
-        const renderAgenda = () => {
-            // Lógica para visualização semanal/mensal (simplesmente lista por enquanto)
-            const sortedAppointments = state.appointments
-                .sort((a, b) => new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time));
-
-            const appointmentsGroupedByDate = sortedAppointments.reduce((acc, app) => {
-                const dateKey = new Date(app.date).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
-                if (!acc[dateKey]) {
-                    acc[dateKey] = [];
-                }
-                acc[dateKey].push(app);
-                return acc;
-            }, {});
-
-            const agendaHtml = Object.keys(appointmentsGroupedByDate).map(dateKey => {
-                const appointmentList = appointmentsGroupedByDate[dateKey].map(app => `
-                    <div onclick="showAppointmentModal('${app.id}')" class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-indigo-500 flex justify-between items-center hover:shadow-md transition cursor-pointer">
-                        <div>
-                            <div class="font-bold text-gray-800">${app.patientName}</div>
-                            <div class="text-sm text-gray-500">${app.time} - ${app.type}</div>
-                        </div>
-                        <div class="text-xs font-semibold px-2 py-1 rounded-full ${app.status === 'Completed' ? 'text-green-600 bg-green-100' : 'text-yellow-600 bg-yellow-100'}">${app.status === 'Completed' ? 'Concluída' : 'Agendada'}</div>
-                    </div>
-                `).join('');
-
-                return `
-                    <div class="space-y-2">
-                        <h3 class="text-lg font-semibold text-gray-700 capitalize">${dateKey}</h3>
-                        ${appointmentList}
-                    </div>
-                `;
-            }).join('');
-
-
-            return `
-                <div class="p-4 space-y-6">
-                    <h1 class="text-2xl font-bold text-gray-800">Agenda de Atendimentos (${state.appointments.length})</h1>
-                    <div class="flex justify-between items-center">
-                         <button onclick="showAppointmentModal()" class="p-3 bg-indigo-500 text-white rounded-xl shadow-md hover:bg-indigo-600 transition text-sm font-semibold flex items-center space-x-2">
-                            <i data-lucide="plus" class="w-5 h-5"></i>
-                            <span>Novo Agendamento</span>
-                        </button>
-                        <button onclick="navigateTo('patients')" class="text-sm text-gray-600 hover:text-indigo-600 font-medium flex items-center">
-                            Ver por Paciente <i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>
-                        </button>
-                    </div>
-
-                    <div class="bg-indigo-50 p-3 rounded-lg flex justify-around text-sm font-medium mb-4">
-                        <button class="text-indigo-600 font-bold border-b-2 border-indigo-600 pb-1">Semana</button>
-                        <button class="text-gray-500 hover:text-indigo-600">Mês</button>
-                        <button class="text-gray-500 hover:text-indigo-600">Paciente</button>
-                    </div>
-
-                    ${agendaHtml || '<p class="text-center text-gray-500 bg-gray-50 p-4 rounded-lg">Nenhuma consulta na agenda.</p>'}
-                </div>
-            `;
-        };
-
-        const renderFinance = () => {
-            const currentMonth = new Date().toISOString().substring(0, 7);
-            const monthlyRecords = state.finances
-                .filter(f => f.date && f.date.substring(0, 7) === currentMonth)
-                .sort((a, b) => new Date(b.date) - new Date(a.date)); // Mais recente primeiro
-            
-            const totalIncome = monthlyRecords
-                .filter(f => f.type === 'income')
-                .reduce((sum, f) => sum + f.amount, 0);
-            const totalExpense = monthlyRecords
-                .filter(f => f.type === 'expense')
-                .reduce((sum, f) => sum + f.amount, 0);
-            const balance = totalIncome - totalExpense;
-
-            const financeList = monthlyRecords.map(f => `
-                <div class="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center border-l-4 ${f.type === 'income' ? 'border-green-500' : 'border-red-500'}">
-                    <div>
-                        <div class="font-bold text-gray-800">${f.description}</div>
-                        <div class="text-sm text-gray-500">${new Date(f.date).toLocaleDateString('pt-BR')}</div>
-                    </div>
-                    <div class="font-semibold ${f.type === 'income' ? 'text-green-600' : 'text-red-600'} flex items-center">
-                        ${f.type === 'income' ? '+' : '-'} ${formatCurrency(f.amount)}
-                        <button onclick="showDeleteConfirmation('finance', '${f.id}')" class="ml-2 text-gray-400 hover:text-red-500 transition">
-                             <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-
-            return `
-                <div class="p-4 space-y-6">
-                    <h1 class="text-2xl font-bold text-gray-800">Gestão Financeira (${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })})</h1>
-
-                    <div class="bg-indigo-500 text-white p-5 rounded-xl shadow-lg">
-                        <div class="flex justify-between items-center mb-3">
-                            <span class="text-sm font-medium">Balanço do Mês:</span>
-                            <span class="text-xl font-extrabold ${balance >= 0 ? 'text-green-300' : 'text-red-300'}">${formatCurrency(balance)}</span>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4 border-t border-indigo-400 pt-3">
-                            <div class="text-center">
-                                <p class="text-xs text-indigo-200">Receitas</p>
-                                <p class="font-bold text-green-300">${formatCurrency(totalIncome)}</p>
-                            </div>
-                            <div class="text-center">
-                                <p class="text-xs text-indigo-200">Despesas</p>
-                                <p class="font-bold text-red-300">${formatCurrency(totalExpense)}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-xl font-semibold text-gray-700">Transações Recentes</h2>
-                        <button onclick="showFinanceModal()" class="p-3 bg-green-500 text-white rounded-xl shadow-md hover:bg-green-600 transition text-sm font-semibold flex items-center space-x-2">
-                            <i data-lucide="plus" class="w-5 h-5"></i>
-                            <span>Nova Transação</span>
-                        </button>
-                    </div>
-
-                    <div class="space-y-3">
-                        ${financeList || '<p class="text-center text-gray-500 bg-gray-50 p-4 rounded-lg">Nenhuma transação registrada neste mês.</p>'}
-                    </div>
-                </div>
-            `;
-        };
-
-        // Renderização de lista simples para Medicações (exemplo de outra view)
-        const renderMedicationList = () => {
-            return `
-                 <div class="p-4 space-y-4">
-                    <h1 class="text-2xl font-bold text-gray-800">Medicamentos/Psicofármacos (Simulação)</h1>
-                    <p class="text-gray-600">Esta seção permite o gerenciamento rápido dos medicamentos que seus pacientes estão utilizando.</p>
-                    <div class="bg-yellow-50 p-4 rounded-xl text-yellow-800">Funcionalidade em desenvolvimento...</div>
-                    <button onclick="navigateTo('dashboard')" class="p-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition">Voltar para o Dashboard</button>
-                </div>
-            `;
-        };
-
-
-        // --- MODAL FUNCTIONS (UI/UX) ---
-
-        // Modal: Appointment (Agendar/Editar Consulta)
-        window.showAppointmentModal = (appointmentId = null, patientId = null) => {
-            const app = appointmentId ? state.appointments.find(a => a.id === appointmentId) : null;
-            const title = app ? 'Editar/Reagendar Consulta' : 'Nova Consulta';
-            const defaultDate = app ? app.date : new Date().toISOString().substring(0, 10);
-            const defaultTime = app ? app.time : '09:00';
-            const defaultType = app ? app.type : 'Online';
-            const patientOptions = state.patients.map(p => `<option value="${p.id}" ${p.id === (app?.patientId || patientId) ? 'selected' : ''}>${p.fullName}</option>` ).join('');
-
-            const content = `
-                <form id="appointment-form" data-app-id="${appointmentId || ''}" class="space-y-4">
-                    <div class="space-y-2">
-                        <label for="app-patientId" class="block text-sm font-medium text-gray-700">Paciente <span class="text-red-500">*</span></label>
-                        <select id="app-patientId" name="patientId" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                            <option value="">Selecione um Paciente</option>
-                            ${patientOptions}
-                        </select>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <label for="app-date" class="block text-sm font-medium text-gray-700">Data <span class="text-red-500">*</span></label>
-                            <input type="date" id="app-date" name="date" value="${defaultDate}" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                        </div>
-                        <div class="space-y-2">
-                            <label for="app-time" class="block text-sm font-medium text-gray-700">Hora <span class="text-red-500">*</span></label>
-                            <input type="time" id="app-time" name="time" value="${defaultTime}" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                        </div>
-                    </div>
-                    <div class="space-y-2">
-                        <label for="app-type" class="block text-sm font-medium text-gray-700">Tipo de Consulta <span class="text-red-500">*</span></label>
-                        <select id="app-type" name="type" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                            <option value="Online" ${defaultType === 'Online' ? 'selected' : ''}>Online (Vídeo)</option>
-                            <option value="Presencial" ${defaultType === 'Presencial' ? 'selected' : ''}>Presencial</option>
-                            <option value="Outro" ${defaultType === 'Outro' ? 'selected' : ''}>Outro</option>
-                        </select>
-                    </div>
-                    
-                    <div class="space-y-2">
-                        <label for="app-notes" class="block text-sm font-medium text-gray-700">Notas Adicionais</label>
-                        <textarea id="app-notes" name="notes" rows="2" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">${app?.notes || ''}</textarea>
-                    </div>
-
-                    <button type="submit" class="w-full p-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition">
-                        ${app ? 'Salvar Alterações' : 'Agendar Consulta'}
-                    </button>
-                    ${app ? `<button type="button" onclick="showDeleteConfirmation('appointment', '${app.id}')" class="w-full p-3 bg-red-500 text-white rounded-xl font-semibold mt-2 hover:bg-red-600 transition">Cancelar Consulta</button>` : ''}
-                </form>
-            `;
-            showModal(content, title);
-        };
-
-        // Modal: Record (Registro de Atendimento/Evolução)
-        window.showRecordModal = async (appointmentId, patientId) => {
-            const patient = getPatientById(patientId);
-            if (!patient) return showMessage('Paciente não encontrado.', 'error');
-            const recordRef = doc(db, privatePath('records'), appointmentId);
-            const recordSnap = await getDoc(recordRef);
-            const record = recordSnap.exists() ? recordSnap.data() : null;
-
-            const title = `Registro - ${patient.fullName} (${formatDateTime(new Date())})`;
-            const content = `
-                <form id="record-form" data-app-id="${appointmentId}" data-patient-id="${patientId}" class="space-y-4">
-                    <div class="space-y-2">
-                        <label for="record-queixa" class="block text-sm font-medium text-gray-700">Queixa Principal</label>
-                        <textarea id="record-queixa" name="queixaPrincipal" rows="2" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" required>${record?.queixaPrincipal || ''}</textarea>
-                    </div>
-                    <div class="space-y-2">
-                        <label for="record-assuntos" class="block text-sm font-medium text-gray-700">Assuntos Discutidos / Evolução</label>
-                        <textarea id="record-assuntos" name="assuntosDiscutidos" rows="5" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" required>${record?.assuntosDiscutidos || ''}</textarea>
-                    </div>
-                    <div class="space-y-2">
-                        <label for="record-tarefas" class="block text-sm font-medium text-gray-700">Tarefas/Sugestões Próxima Sessão</label>
-                        <textarea id="record-tarefas" name="tarefasSugestoes" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">${record?.tarefasSugestoes || ''}</textarea>
-                    </div>
-                    <button type="submit" class="w-full p-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition">
-                        Salvar Registro de Atendimento
-                    </button>
-                    ${record ? `<p class="text-xs text-center text-gray-500 mt-2">Última atualização: ${formatDateTime(record.updatedAt)}</p>` : ''}
-                </form>
-            `;
-            showModal(content, title);
-        };
-
-        // Modal: Finance (Registro Financeiro)
-        window.showFinanceModal = (record = null) => {
-            const isEdit = !!record;
-            const title = isEdit ? 'Editar Transação' : 'Nova Transação Financeira';
-            const content = `
-                <form id="finance-form" data-record-id="${record?.id || ''}" class="space-y-4">
-                    <div class="space-y-2">
-                        <label for="finance-type" class="block text-sm font-medium text-gray-700">Tipo <span class="text-red-500">*</span></label>
-                        <select id="finance-type" name="type" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                            <option value="income" ${record?.type === 'income' ? 'selected' : ''}>Receita (Entrada)</option>
-                            <option value="expense" ${record?.type === 'expense' ? 'selected' : ''}>Despesa (Saída)</option>
-                        </select>
-                    </div>
-                    <div class="space-y-2">
-                        <label for="finance-description" class="block text-sm font-medium text-gray-700">Descrição <span class="text-red-500">*</span></label>
-                        <input type="text" id="finance-description" name="description" value="${record?.description || ''}" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <label for="finance-amount" class="block text-sm font-medium text-gray-700">Valor (R$) <span class="text-red-500">*</span></label>
-                            <input type="number" id="finance-amount" name="amount" step="0.01" value="${record?.amount || ''}" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                        </div>
-                        <div class="space-y-2">
-                            <label for="finance-date" class="block text-sm font-medium text-gray-700">Data <span class="text-red-500">*</span></label>
-                            <input type="date" id="finance-date" name="date" value="${record?.date || new Date().toISOString().substring(0, 10)}" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                        </div>
-                    </div>
-                    <button type="submit" class="w-full p-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition">
-                        ${isEdit ? 'Salvar Alterações' : 'Registrar Transação'}
-                    </button>
-                </form>
-            `;
-            showModal(content, title);
-        };
-
-        // Modal: Document (Emissão de Documentos)
-        window.showDocumentModal = (patientId, patientName) => {
-            const title = `Emissão de Documento para ${patientName}`;
-            const today = new Date().toLocaleDateString('pt-BR');
-            const content = `
-                <form id="document-form" data-patient-id="${patientId}" data-patient-name="${patientName}" class="space-y-4">
-                    <div class="space-y-2">
-                        <label for="doc-type" class="block text-sm font-medium text-gray-700">Tipo de Documento <span class="text-red-500">*</span></label>
-                        <select id="doc-type" name="docType" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                            <option value="">Selecione...</option>
-                            <option value="DeclaracaoAcompanhamento">Declaração de Acompanhamento</option>
-                            <option value="AtestadoInaptidao">Atestado de Inaptidão</option>
-                            <option value="ReceitaSimples">Receita Simples (Psicofármacos)</option>
-                        </select>
-                    </div>
-                    <div class="space-y-2">
-                        <label for="doc-content" class="block text-sm font-medium text-gray-700">Conteúdo do Documento</label>
-                        <textarea id="doc-content" name="docContent" rows="8" class="text-area-custom w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="O conteúdo será preenchido automaticamente com base no tipo selecionado."></textarea>
-                    </div>
-
-                    <button type="submit" class="w-full p-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition">
-                        Gerar PDF e Salvar
-                    </button>
-                    <button type="button" onclick="simulatedWhatsAppSend('${patientName}')" class="w-full p-3 bg-green-500 text-white rounded-xl font-semibold mt-2 hover:bg-green-600 transition flex items-center justify-center space-x-2">
-                        <i data-lucide="send" class="w-5 h-5"></i>
-                        <span>Simular Envio por WhatsApp</span>
-                    </button>
-                </form>
-            `;
-            showModal(content, title);
-
-            // Adiciona listener para preenchimento automático
-            document.getElementById('doc-type')?.addEventListener('change', (e) => {
-                const type = e.target.value;
-                const textarea = document.getElementById('doc-content');
-                let newContent = '';
-                if (type === 'ReceitaSimples') {
-                    newContent = `RECEITA SIMPLES\n\n- Medicamento: [Nome do Remédio] - Dosagem: [X mg]\n- Frequência: [X vezes ao dia]\n\nObservações: [Informações Adicionais]`;
-                } else if (type === 'AtestadoInaptidao') {
-                    newContent = `Eu, [Seu Nome], Psicólogo(a) registrado(a) no CRP, atesto a inaptidão momentânea de ${patientName} para [atividade/trabalho] por um período de [X dias], a partir desta data, ${today}.`;
-                } else if (type === 'DeclaracaoAcompanhamento') {
-                    newContent = `Eu, [Seu Nome], Psicólogo(a) registrado(a) no CRP, declaro que ${patientName} está em acompanhamento psicológico sob meus cuidados desde [Data de Início].`;
-                }
-                textarea.value = newContent;
-            });
-        };
-
-        window.simulatedWhatsAppSend = (patientName) => {
-            const patient = state.patients.find(p => p.fullName === patientName);
-            if (patient) {
-                openWhatsAppChat(patient.contacts.whatsapp, `Olá ${patientName}, aqui está o seu documento que acabamos de gerar. https://es.dopdf.com/`);
-            } else {
-                showMessage('Paciente não encontrado para enviar WhatsApp.', 'error');
-            }
-        };
-
-        // Modal: Confirmation
-        window.showDeleteConfirmation = (dataType, id) => {
-            const title = `Confirmar Exclusão`;
-            const message = `Você tem certeza que deseja excluir este ${dataType} permanentemente? Esta ação é irreversível.`;
-            const content = `
-                <p class="text-center text-gray-700 mb-6">${message}</p>
-                <div class="flex space-x-4">
-                    <button onclick="closeModal('confirmation-modal')" class="flex-1 p-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition">Cancelar</button>
-                    <button id="confirm-delete-btn" data-type="${dataType}" data-id="${id}" class="flex-1 p-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition">Confirmar Exclusão</button>
-                </div>
-            `;
-            showModal(content, title, 'confirmation-modal');
-        };
-
-        // --- ATTACH EVENT LISTENERS ---
-        const attachEventListeners = () => {
-            // Patient Form Submit
-            document.getElementById('patient-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const form = e.target;
-                const patientId = form.id.value || null;
-                const patientData = {
-                    fullName: form.fullName.value,
-                    age: form.age.value ? parseInt(form.age.value) : null,
-                    contacts: {
-                        whatsapp: form.whatsapp.value,
-                        email: form.email.value,
-                    },
-                    address: form.address.value,
-                    clinicalHistory: form.clinicalHistory.value,
-                    medications: form.medications.value,
-                    observations: form.observations.value,
-                };
-                await savePatient(patientData, patientId);
-                navigateTo('patients');
-            });
-
-            // Appointment Form Submit
-            document.getElementById('appointment-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const form = e.target;
-                const appointmentId = form.getAttribute('data-app-id') || null;
-                const appointmentData = {
-                    patientId: form.patientId.value,
-                    date: form.date.value,
-                    time: form.time.value,
-                    type: form.type.value,
-                    notes: form.notes.value,
-                };
-                await saveAppointment(appointmentData, appointmentId);
-                closeModal();
-                navigateTo('agenda');
-            });
-            
-            // Record Form Submit
-            document.getElementById('record-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const form = e.target;
-                const appointmentId = form.getAttribute('data-app-id');
-                const patientId = form.getAttribute('data-patient-id');
-                const recordData = {
-                    queixaPrincipal: form.queixaPrincipal.value,
-                    assuntosDiscutidos: form.assuntosDiscutidos.value,
-                    tarefasSugestoes: form.tarefasSugestoes.value,
-                };
-                await saveRecord(recordData, appointmentId, patientId);
-                closeModal();
-            });
-
-            // Finance Form Submit
-            document.getElementById('finance-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const form = e.target;
-                const financeData = {
-                    type: form.type.value,
-                    description: form.description.value,
-                    amount: form.amount.value,
-                    date: form.date.value,
-                };
-                await saveFinanceRecord(financeData);
-                closeModal();
-                navigateTo('finance');
-            });
-
-            // Document Form Submit (Simulation of PDF Generation and Storage)
-            document.getElementById('document-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const form = e.target;
-                const patientId = form.getAttribute('data-patient-id');
-                const patientName = form.getAttribute('data-patient-name');
-                const docType = form.docType.value;
-                const docContent = form.docContent.value;
-
-                if (!docType || !docContent) {
-                    return showMessage('Selecione o tipo e preencha o conteúdo do documento.', 'error');
-                }
-
-                showLoading('Gerando PDF e fazendo upload...');
-
-                // --- PDF Generation Simulation (A real application would use jsPDF or similar) ---
-                const pdfContent = `
---- ${docType.toUpperCase().replace(/SIMPLES|ACOMPANHAMENTO/g, '').replace('ATTESTADO', 'ATESTADO')} ---
-
-Paciente: ${patientName}
-Conteúdo: 
-${docContent}
-
-_________________________
-Assinatura do Psicólogo(a)
-
-Data: ${new Date().toLocaleDateString('pt-BR')}
-`;
-                // Simple Base64 encoding of the text content for storage simulation
-                const pdfBase64 = btoa(pdfContent); 
-                const downloadURL = await uploadDocument(`${docType}_${patientName}`, pdfBase64);
-                
-                if (downloadURL) {
-                    // Salvar referência no Firestore (Documents Collection)
-                    await addDoc(collection(db, privatePath('documents')), {
-                        patientId,
-                        patientName,
-                        type: docType,
-                        contentSummary: docContent.substring(0, 100) + '...',
-                        fileUrl: downloadURL,
-                        createdAt: serverTimestamp(),
-                        userId: userId
-                    });
-                    
-                    showMessage('Documento gerado, salvo no Storage e referenciado no Firestore!', 'success');
-                    closeModal();
-                }
-
-                hideLoading();
-            });
-
-            // Confirmation Delete Button
-            document.getElementById('confirm-delete-btn')?.addEventListener('click', async (e) => {
-                const dataType = e.target.getAttribute('data-type');
-                const id = e.target.getAttribute('data-id');
-                if (dataType === 'patient') {
-                    await deletePatient(id);
-                } else if (dataType === 'appointment') {
-                    await deleteAppointment(id);
-                } else if (dataType === 'finance') {
-                    await deleteFinanceRecord(id);
-                }
-                closeModal('confirmation-modal');
-            });
-        };
-
-        // --- MAIN APP INIT ---
-        window.onload = () => {
-            initializeFirebase();
-            // Expor funções para uso no HTML inline
-            window.navigateTo = navigateTo;
-            window.toggleSidebar = toggleSidebar;
-            window.closeModal = closeModal;
-            window.showAppointmentModal = showAppointmentModal;
-            window.showRecordModal = showRecordModal;
-            window.showFinanceModal = showFinanceModal;
-            window.showDocumentModal = showDocumentModal;
-            window.showDeleteConfirmation = showDeleteConfirmation;
-            window.openWhatsAppChat = openWhatsAppChat;
-            window.handleLogout = handleLogout;
-            window.toggleAuthMode = toggleAuthMode;
-        };
-
-    </script>
-
+    <title>Sistema Financeiro - Igreja</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        .sidebar-item-active {
-            background-color: #eef2ff; /* indigo-50 */
-            color: #4f46e5; /* indigo-600 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Login Screen */
+        .login-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-box {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-box h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .login-box p {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        /* Main App */
+        .app-container {
+            display: none;
+            background: #f8f9fa;
+            min-height: 100vh;
+        }
+
+        .app-container.active {
+            display: block;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header h2 {
+            color: #667eea;
+            font-size: 20px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
             font-weight: 600;
         }
-        .text-area-custom {
-            height: 200px;
-            font-family: monospace;
-            white-space: pre-wrap;
+
+        .btn-logout {
+            padding: 8px 16px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Navigation */
+        .nav-tabs {
+            background: white;
+            padding: 15px 20px;
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .nav-tab {
+            padding: 10px 20px;
+            border: none;
+            background: #f5f5f5;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        .nav-tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        /* Content */
+        .content {
+            padding: 20px;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        /* Cards */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: all 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .card-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .card-icon.purple {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .card-icon.green {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .card-icon.orange {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .card-icon.red {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .card-icon.blue {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+        }
+
+        .card-title {
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .card-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        /* Chart */
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            margin-bottom: 30px;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .chart-header h3 {
+            font-size: 18px;
+            color: #333;
+        }
+
+        /* Table */
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            overflow-x: auto;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .table-header h3 {
+            font-size: 18px;
+            color: #333;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f5f5f5;
+            padding: 8px 15px;
+            border-radius: 8px;
+        }
+
+        .search-box input {
+            border: none;
+            background: transparent;
+            outline: none;
+            font-size: 14px;
+            width: 200px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px;
+            background: #f8f9fa;
+            color: #666;
+            font-weight: 600;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 15px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .status-pending {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .status-approved {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+
+        .status-paid {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .status-reimbursed {
+            background: #e0e7ff;
+            color: #6366f1;
+        }
+
+        .status-denied {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .action-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-right: 5px;
+            transition: all 0.3s;
+        }
+
+        .action-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* Form */
+        .form-container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            max-width: 600px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .file-upload {
+            border: 2px dashed #e0e0e0;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .file-upload:hover {
+            border-color: #667eea;
+            background: #f8f9fa;
+        }
+
+        .file-upload input {
+            display: none;
+        }
+
+        .file-upload-icon {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            font-size: 20px;
+            color: #333;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        /* List Items */
+        .list-item {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .list-item-info h4 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .list-item-info p {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .list-item-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            color: #e0e0e0;
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .empty-state p {
+            color: #999;
+            margin-bottom: 20px;
+        }
+
+        /* Loading */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .search-box input {
+                width: 150px;
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+
+        .hidden {
+            display: none !important;
         }
     </style>
-
 </head>
-<body class="min-h-screen">
-    
-    <div id="auth-overlay" class="fixed inset-0 bg-gray-100 flex items-center justify-center z-50 hidden">
-        <div id="auth-content" class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+<body>
+    <div id="loginScreen" class="login-container">
+        <div class="login-box">
+            <h1>🙏 Sistema Financeiro</h1>
+            <p>Igreja - Gestão de Contas</p>
+            <div id="loginForm">
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="loginEmail" required placeholder="seu@email.com">
+                </div>
+                <div class="input-group">
+                    <label>Senha</label>
+                    <input type="password" id="loginPassword" required placeholder="••••••••">
+                </div>
+                <button type="button" class="btn btn-primary" onclick="handleLogin()">
+                    <span class="material-icons">login</span>
+                    Entrar
+                </button>
             </div>
-    </div>
-    
-    <div id="loading-overlay" class="fixed inset-0 bg-indigo-50/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 transition-opacity duration-300 opacity-0">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-600"></div>
-        <p id="loading-text-main" class="mt-4 text-indigo-700 font-semibold">Carregando Plataforma...</p>
-        <p id="loading-text-sub" class="text-sm text-indigo-500">Autenticando com Firebase.</p>
+            <div id="loginError" style="color: #ef4444; text-align: center; margin-top: 15px; display: none;"></div>
+        </div>
     </div>
 
-    <div id="message-box" class="opacity-0 transition-opacity duration-300 fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50"></div>
+    <div id="appContainer" class="app-container">
+        <div class="header">
+            <div class="header-left">
+                <h2>💰 Sistema Financeiro</h2>
+            </div>
+            <div class="user-info">
+                <div class="user-avatar" id="userAvatar"></div>
+                <div>
+                    <div style="font-weight: 600; font-size: 14px;" id="userName"></div>
+                    <div style="font-size: 12px; color: #666;" id="userRole"></div>
+                </div>
+                <button class="btn-logout" onclick="logout()">
+                    <span class="material-icons" style="font-size: 18px;">logout</span>
+                    Sair
+                </button>
+            </div>
+        </div>
 
-    <div class="relative flex h-screen overflow-hidden">
+        <div class="nav-tabs" id="navTabs"></div>
+
+        <div class="content">
+            <div id="dashboardScreen" class="screen active">
+                <div class="cards-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon green">
+                                <span class="material-icons">trending_up</span>
+                            </div>
+                            <div>
+                                <div class="card-title">Entradas do Mês</div>
+                                <div class="card-value" id="totalIn">R$ 0,00</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon red">
+                                <span class="material-icons">trending_down</span>
+                            </div>
+                            <div>
+                                <div class="card-title">Saídas do Mês</div>
+                                <div class="card-value" id="totalOut">R$ 0,00</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon blue">
+                                <span class="material-icons">account_balance</span>
+                            </div>
+                            <div>
+                                <div class="card-title">Balanço</div>
+                                <div class="card-value" id="balance">R$ 0,00</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3>📅 Próximos Vencimentos</h3>
+                    </div>
+                    <div id="upcomingTransactions"></div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3>Solicitações Recentes</h3>
+                    </div>
+                    <div id="recentRequests"></div>
+                </div>
+            </div>
+
+            <div id="requestsScreen" class="screen">
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3>Todas as Solicitações</h3>
+                        <div class="search-box">
+                            <span class="material-icons">search</span>
+                            <input type="text" placeholder="Buscar..." id="searchRequests" onkeyup="filterRequests()">
+                        </div>
+                    </div>
+                    <div id="allRequests"></div>
+                </div>
+            </div>
+
+            <div id="newRequestScreen" class="screen">
+                <div class="form-container">
+                    <h3 style="margin-bottom: 25px;">Nova Solicitação de Gasto</h3>
+                    <form id="newRequestForm">
+                        
+                        <div class="form-group">
+                            <label>Tipo de Requisição *</label>
+                            <select id="requestType" required>
+                                <option value="">Selecione...</option>
+                                <option value="pagamento">Pagamento</option>
+                                <option value="ressarcimento">Ressarcimento</option>
+                                <option value="investimento">Investimento</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Categoria *</label>
+                            <select id="requestCategory" required>
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Descrição *</label>
+                            <textarea id="requestDescription" required placeholder="Descreva a solicitação..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Valor (R$) *</label>
+                            <input type="number" id="requestValue" required step="0.01" min="0" placeholder="0,00">
+                        </div>
+                        <div class="form-group">
+                            <label>Comprovante</label>
+                            <div class="file-upload" onclick="document.getElementById('requestProof').click()">
+                                <input type="file" id="requestProof" accept="image/*,.pdf">
+                                <div class="file-upload-icon">
+                                    <span class="material-icons">cloud_upload</span>
+                                </div>
+                                <div>Clique para anexar comprovante</div>
+                                <div style="font-size: 12px; color: #999; margin-top: 5px;">PDF ou Imagem</div>
+                            </div>
+                            <div id="fileName" style="margin-top: 10px; font-size: 14px; color: #667eea;"></div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <span class="material-icons">send</span>
+                            Enviar Solicitação
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="categoriesScreen" class="screen">
+                <div style="max-width: 800px;">
+                    <div class="form-container" style="margin-bottom: 30px;">
+                        <h3 style="margin-bottom: 20px;">Nova Categoria</h3>
+                        <form id="newCategoryForm">
+                            <div class="form-group">
+                                <label>Nome da Categoria *</label>
+                                <input type="text" id="categoryName" required placeholder="Ex: Água, Luz, Ministérios...">
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <span class="material-icons">add</span>
+                                Adicionar Categoria
+                            </button>
+                        </form>
+                    </div>
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3>Categorias Cadastradas</h3>
+                        </div>
+                        <div id="categoriesList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="usersScreen" class="screen">
+                <div style="max-width: 800px;">
+                    <div class="form-container" style="margin-bottom: 30px;">
+                        <h3 style="margin-bottom: 20px;">Novo Usuário</h3>
+                        <form id="newUserForm">
+                            <div class="form-group">
+                                <label>Nome Completo *</label>
+                                <input type="text" id="newUserName" required placeholder="Nome do usuário">
+                            </div>
+                            <div class="form-group">
+                                <label>Email *</label>
+                                <input type="email" id="newUserEmail" required placeholder="email@exemplo.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Senha *</label>
+                                <input type="password" id="newUserPassword" required placeholder="Mínimo 6 caracteres" minlength="6">
+                            </div>
+                            <div class="form-group">
+                                <label>Função *</label>
+                                <select id="newUserRole" required>
+                                    <option value="member">Membro</option>
+                                    <option value="admin">Administrador</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <span class="material-icons">person_add</span>
+                                Criar Usuário
+                            </button>
+                        </form>
+                    </div>
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3>Usuários Cadastrados</h3>
+                        </div>
+                        <div id="usersList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="cashFlowScreen" class="screen">
+                <div style="max-width: 800px;">
+                    <div class="form-container" style="margin-bottom: 30px;">
+                        <h3 style="margin-bottom: 20px;">Novo Lançamento (Caixa)</h3>
+                        <form id="newCashFlowForm">
+                            
+                            <div class="form-group">
+                                <label>Tipo de Movimento *</label>
+                                <select id="transactionDirection" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="in">💰 Entrada (Dízimo, Oferta, etc.)</option>
+                                    <option value="out">💸 Saída (Conta Fixa, Pagamento Direto)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Título *</label>
+                                <input type="text" id="transactionTitle" required placeholder="Ex: Dízimo de Fulano / Pagamento de Água">
+                            </div>
+                            <div class="form-group">
+                                <label>Categoria *</label>
+                                <select id="transactionCategory" required>
+                                    <option value="">Selecione...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Valor (R$) *</label>
+                                <input type="number" id="transactionValue" required step="0.01" min="0" placeholder="0,00">
+                            </div>
+                            <div class="form-group">
+                                <label>Data do Lançamento *</label>
+                                <input type="date" id="transactionDate" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <span class="material-icons">add</span>
+                                Registrar Lançamento
+                            </button>
+                        </form>
+                    </div>
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3>Histórico de Lançamentos</h3>
+                        </div>
+                        <div id="cashFlowList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="requestModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Detalhes da Solicitação</h3>
+                <button class="close-modal" onclick="closeRequestModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div id="requestDetails"></div>
+        </div>
+    </div>
+
+    <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Carregando...</p>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDiLxDM7ottlE-59G5Gjtsyb_qYWNGF57g",
+            authDomain: "lagoinha-f73cc.firebaseapp.com",
+            projectId: "lagoinha-f73cc",
+            storageBucket: "lagoinha-f73cc.firebasestorage.app",
+            messagingSenderId: "657454722836",
+            appId: "1:657454722836:web:2ba3acd3c4712ccb609c01"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        let currentUser = null;
+        let currentUserData = null;
+
+        // Auth State Observer
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                currentUser = user;
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                if (userDoc.exists) {
+                    currentUserData = userDoc.data();
+                    showApp();
+                } else {
+                    logout();
+                }
+            } else {
+                showLogin();
+            }
+        });
+
+        // Login
+        async function handleLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+            } catch (error) {
+                errorDiv.textContent = 'Email ou senha incorretos';
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        // Add Enter key listener for login
+        document.addEventListener('DOMContentLoaded', () => {
+            const emailInput = document.getElementById('loginEmail');
+            const passwordInput = document.getElementById('loginPassword');
+            
+            if (emailInput && passwordInput) {
+                [emailInput, passwordInput].forEach(input => {
+                    input.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            handleLogin();
+                        }
+                    });
+                });
+            }
+        });
+
+        // Logout
+        function logout() {
+            auth.signOut();
+        }
+
+        // Show Login
+        function showLogin() {
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('appContainer').classList.remove('active');
+        }
+
+        // Show App
+        function showApp() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('appContainer').classList.add('active');
+
+            // Set user info
+            document.getElementById('userName').textContent = currentUserData.name;
+            document.getElementById('userRole').textContent = currentUserData.role === 'admin' ? 'Administrador' : 'Membro';
+            document.getElementById('userAvatar').textContent = currentUserData.name.charAt(0).toUpperCase();
+
+            // Setup navigation
+            setupNavigation();
+
+            // Load data
+            loadDashboard();
+            loadCategories();
+            loadRequests();
+
+            if (currentUserData.role === 'admin') {
+                loadUsers();
+                loadCashFlow(); // Carrega os lançamentos de caixa
+            }
+        }
+
+        // Setup Navigation
+        function setupNavigation() {
+            const navTabs = document.getElementById('navTabs');
+            const isAdmin = currentUserData.role === 'admin';
+
+            const tabs = [
+                { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', screen: 'dashboardScreen' },
+                { id: 'requests', label: 'Solicitações', icon: 'list_alt', screen: 'requestsScreen' },
+                { id: 'newRequest', label: 'Nova Solicitação', icon: 'add_circle', screen: 'newRequestScreen' }
+            ];
+
+            if (isAdmin) {
+                tabs.push(
+                    { id: 'categories', label: 'Categorias', icon: 'category', screen: 'categoriesScreen' },
+                    { id: 'users', label: 'Usuários', icon: 'people', screen: 'usersScreen' },
+                    { id: 'cashFlow', label: 'Lançamentos', icon: 'receipt_long', screen: 'cashFlowScreen' } // Renomeado
+                );
+            }
+
+            navTabs.innerHTML = tabs.map(tab => `
+                <button class="nav-tab ${tab.id === 'dashboard' ? 'active' : ''}" onclick="switchScreen('${tab.screen}', this)">
+                    <span class="material-icons">${tab.icon}</span>
+                    ${tab.label}
+                </button>
+            `).join('');
+        }
+
+        // Switch Screen
+        function switchScreen(screenId, button) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            button.classList.add('active');
+        }
+
+        // Load Dashboard
+        async function loadDashboard() {
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+            let totalIn = 0;
+            let totalOut = 0;
+
+            // 1. Contabilizar Lançamentos de Fluxo de Caixa (transactions)
+            // Nota: Esta consulta usa a data como string (YYYY-MM-DD) para compatibilidade com o input type="date"
+            const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
+            const endOfMonthStr = endOfMonth.toISOString().split('T')[0];
+
+            const transactionsSnapshot = await db.collection('transactions')
+                .where('transactionDate', '>=', startOfMonthStr)
+                .where('transactionDate', '<=', endOfMonthStr)
+                .get();
+
+            transactionsSnapshot.forEach(doc => {
+                const data = doc.data();
+                const value = data.value || 0;
+                
+                // Contabiliza APENAS lançamentos com status de 'paid' ou 'approved'
+                if (['approved', 'paid'].includes(data.status)) {
+                    if (data.direction === 'in') {
+                        totalIn += value;
+                    } else { // direction === 'out'
+                        totalOut += value;
+                    }
+                }
+            });
+            
+            // 2. Contabilizar Solicitações Aprovadas (requests - Apenas Saídas)
+            const requestsSnapshot = await db.collection('requests')
+                .where('createdAt', '>=', startOfMonth)
+                .get();
+
+            requestsSnapshot.forEach(doc => {
+                const data = doc.data();
+                const value = data.value || 0;
+                
+                // Solicitações são Saídas e contabilizadas APENAS se estiverem 'approved', 'paid', ou 'reimbursed'
+                // O campo direction foi fixado como 'out' no formulário, mas é checado por segurança.
+                if (['approved', 'paid', 'reimbursed'].includes(data.status) && data.direction === 'out') {
+                    totalOut += value;
+                }
+            });
+
+
+            const balance = totalIn - totalOut;
+
+            // Atualiza os cards
+            document.getElementById('totalIn').textContent = formatCurrency(totalIn);
+            document.getElementById('totalOut').textContent = formatCurrency(totalOut);
+            document.getElementById('balance').textContent = formatCurrency(balance);
+            document.getElementById('balance').style.color = balance >= 0 ? '#10b981' : '#ef4444';
+
+            // Carregar próximos vencimentos
+            await loadUpcomingTransactions();
+
+            // Carregar solicitações recentes
+            loadRecentRequests();
+        }
+
+        // Load Upcoming Transactions (antiga loadUpcomingBills)
+        async function loadUpcomingTransactions() {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayStr = today.toISOString().split('T')[0];
+
+            // Busca lançamentos futuros que são Saídas (contas a pagar) e estão pendentes
+            const transactionsSnapshot = await db.collection('transactions')
+                .where('direction', '==', 'out')
+                .where('status', '==', 'pending') 
+                .where('transactionDate', '>=', todayStr)
+                .orderBy('transactionDate')
+                .limit(10)
+                .get();
+
+            const container = document.getElementById('upcomingTransactions');
+            if (!container) return;
+
+            if (transactionsSnapshot.empty) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <span class="material-icons">event_available</span>
+                        </div>
+                        <h3>Nenhum vencimento próximo</h3>
+                        <p>Não há lançamentos de saída futuros pendentes</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<table><thead><tr><th>Vencimento</th><th>Título</th><th>Categoria</th><th>Valor</th><th>Status</th></tr></thead><tbody>';
+
+            transactionsSnapshot.forEach(doc => {
+                const data = doc.data();
+                const transactionDate = new Date(data.transactionDate);
+                const diffDays = Math.ceil((transactionDate - today) / (1000 * 60 * 60 * 24));
+                const urgency = diffDays <= 3 && diffDays >= 0 ? 'style="background: #fee2e2;"' : '';
+
+                html += `
+                    <tr ${urgency}>
+                        <td>${transactionDate.toLocaleDateString('pt-BR')} ${diffDays <= 3 && diffDays >= 0 ? '⚠️' : ''}</td>
+                        <td>${data.title}</td>
+                        <td>${data.category}</td>
+                        <td>${formatCurrency(data.value)}</td>
+                        <td><span class="status-badge status-${data.status}">${getStatusLabel(data.status)}</span></td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // Load Recent Requests
+        async function loadRecentRequests() {
+            const requestsSnapshot = await db.collection('requests')
+                .orderBy('createdAt', 'desc')
+                .limit(10)
+                .get();
+
+            const container = document.getElementById('recentRequests');
+
+            if (requestsSnapshot.empty) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <span class="material-icons">inbox</span>
+                        </div>
+                        <h3>Nenhuma solicitação</h3>
+                        <p>Ainda não há solicitações registradas</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>';
+
+            requestsSnapshot.forEach(doc => {
+                const data = doc.data();
+
+                html += `
+                    <tr>
+                        <td>${data.createdAt.toDate().toLocaleDateString('pt-BR')}</td>
+                        <td>${capitalizeFirst(data.type)}</td>
+                        <td>${data.description}</td>
+                        <td>${formatCurrency(data.value)}</td>
+                        <td><span class="status-badge status-${data.status}">${getStatusLabel(data.status)}</span></td>
+                        <td>
+                            <button class="action-btn" style="background: #667eea; color: white;" onclick="viewRequest('${doc.id}')">
+                                <span class="material-icons" style="font-size: 14px;">visibility</span>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // Load All Requests
+        async function loadRequests() {
+            let query = db.collection('requests').orderBy('createdAt', 'desc');
+
+            if (currentUserData.role !== 'admin') {
+                query = query.where('userId', '==', currentUser.uid);
+            }
+
+            const requestsSnapshot = await query.get();
+            const container = document.getElementById('allRequests');
+
+            if (requestsSnapshot.empty) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <span class="material-icons">inbox</span>
+                        </div>
+                        <h3>Nenhuma solicitação</h3>
+                        <p>Ainda não há solicitações registradas</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<table id="requestsTable"><thead><tr><th>Data</th><th>Solicitante</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>';
+
+            for (const doc of requestsSnapshot.docs) {
+                const data = doc.data();
+                const userDoc = await db.collection('users').doc(data.userId).get();
+                const userName = userDoc.exists ? userDoc.data().name : 'Desconhecido';
+
+                html += `
+                    <tr>
+                        <td>${data.createdAt.toDate().toLocaleDateString('pt-BR')}</td>
+                        <td>${userName}</td>
+                        <td>${capitalizeFirst(data.type)}</td>
+                        <td>${data.category}</td>
+                        <td>${data.description}</td>
+                        <td>${formatCurrency(data.value)}</td>
+                        <td><span class="status-badge status-${data.status}">${getStatusLabel(data.status)}</span></td>
+                        <td>
+                            <button class="action-btn" style="background: #667eea; color: white;" onclick="viewRequest('${doc.id}')">
+                                <span class="material-icons" style="font-size: 14px;">visibility</span>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // Filter Requests
+        function filterRequests() {
+            const input = document.getElementById('searchRequests').value.toLowerCase();
+            const table = document.getElementById('requestsTable');
+            if (!table) return;
+
+            const rows = table.getElementsByTagName('tr');
+
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(input) ? '' : 'none';
+            }
+        }
+
+        // View Request
+        async function viewRequest(requestId) {
+            const doc = await db.collection('requests').doc(requestId).get();
+            const data = doc.data();
+            const userDoc = await db.collection('users').doc(data.userId).get();
+            const userName = userDoc.exists ? userDoc.data().name : 'Desconhecido';
+
+            const isAdmin = currentUserData.role === 'admin';
+
+            let html = `
+                <div style="margin-bottom: 20px;">
+                    <p style="color: #666; font-size: 14px; margin-bottom: 5px;">Solicitante</p>
+                    <p style="font-weight: 600;">${userName}</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <p style="color: #666; font-size: 14px; margin-bottom: 5px;">Data</p>
+                    <p style="font-weight: 600;">${data.createdAt.toDate().toLocaleString('pt-BR')}</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <p style="color: #666; font-size: 14px; margin-bottom: 5px;">Movimento</p>
+                    <p style="font-weight: 600;">💸 Saída</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <p style="color: #666; font-size: 14px; margin-bottom: 5px;">Tipo</p>
+                    <p style="font-weight: 600;">${capitalizeFirst(data.type)}</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <p style="color: #666; font-size: 14px; margin-bottom: 5px;">Categoria</p>
+                    <p style="font-weight: 600;">${data.category}</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <p style="color: #666; font-size: 14px; margin-bottom: 5px;">Descrição</p>
+                    <p style="font-weight: 600;">${data.description}</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <p style="color: #666; font-size: 14px; margin-bottom: 5px;">Valor</p>
+                    <p style="font-weight: 600; font-size: 24px; color: #667eea;">${formatCurrency(data.value)}</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <p style="color: #666; font-size: 14px; margin-bottom: 5px;">Status</p>
+                    <span class="status-badge status-${data.status}">${getStatusLabel(data.status)}</span>
+                </div>
+            `;
+
+            if (data.proofUrl) {
+                html += `
+                    <div style="margin-bottom: 20px;">
+                        <p style="color: #666; font-size: 14px; margin-bottom: 5px;">Comprovante</p>
+                        <a href="${data.proofUrl}" target="_blank" class="btn btn-secondary" style="display: inline-flex; width: auto;">
+                            <span class="material-icons">attachment</span>
+                            Ver Comprovante
+                        </a>
+                    </div>
+                `;
+            }
+
+            if (isAdmin) {
+                html += `
+                    <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0;">
+                        <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Alterar Status</p>
+                        <div style="display: grid; gap: 10px;">
+                            <button class="btn" style="background: #fbbf24; color: white;" onclick="updateRequestStatus('${requestId}', 'pending')">
+                                Aguardando Aprovação
+                            </button>
+                            <button class="btn" style="background: #3b82f6; color: white;" onclick="updateRequestStatus('${requestId}', 'approved')">
+                                Aprovado
+                            </button>
+                            <button class="btn btn-success" onclick="updateRequestStatus('${requestId}', 'paid')">
+                                Pago
+                            </button>
+                            <button class="btn" style="background: #6366f1; color: white;" onclick="updateRequestStatus('${requestId}', 'reimbursed')">
+                                Ressarcido
+                            </button>
+                            <button class="btn btn-danger" onclick="updateRequestStatus('${requestId}', 'denied')">
+                                Negado
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('requestDetails').innerHTML = html;
+            document.getElementById('requestModal').classList.add('active');
+        }
+
+        // Close Request Modal
+        function closeRequestModal() {
+            document.getElementById('requestModal').classList.remove('active');
+        }
+
+        // Update Request Status
+        async function updateRequestStatus(requestId, status) {
+            try {
+                await db.collection('requests').doc(requestId).update({ status });
+                alert('Status atualizado com sucesso!');
+                closeRequestModal();
+                loadDashboard();
+                loadRequests();
+            } catch (error) {
+                alert('Erro ao atualizar status: ' + error.message);
+            }
+        }
+
+        // New Request Form - Direção fixada como 'out'
+        document.getElementById('newRequestForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const direction = 'out'; // Sempre saída
+            const type = document.getElementById('requestType').value;
+            const category = document.getElementById('requestCategory').value;
+            const description = document.getElementById('requestDescription').value;
+            const value = parseFloat(document.getElementById('requestValue').value);
+            const proofFile = document.getElementById('requestProof').files[0];
+
+            try {
+                document.getElementById('loading').classList.add('active');
+
+                let proofUrl = null;
+                if (proofFile) {
+                    const storageRef = storage.ref(`proofs/${Date.now()}_${proofFile.name}`);
+                    await storageRef.put(proofFile);
+                    proofUrl = await storageRef.getDownloadURL();
+                }
+
+                await db.collection('requests').add({
+                    userId: currentUser.uid,
+                    direction,
+                    type,
+                    category,
+                    description,
+                    value,
+                    proofUrl,
+                    status: 'pending',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                alert('Solicitação enviada com sucesso!');
+                document.getElementById('newRequestForm').reset();
+                document.getElementById('fileName').textContent = '';
+                loadDashboard();
+                loadRequests();
+            } catch (error) {
+                alert('Erro ao enviar solicitação: ' + error.message);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        });
+
+        // File upload display
+        document.getElementById('requestProof').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('fileName').textContent = `📎 ${file.name}`;
+            }
+        });
+
+        // Load Categories
+        async function loadCategories() {
+            const categoriesSnapshot = await db.collection('categories').orderBy('name').get();
+
+            // Populate selects (Solicitação e Lançamento)
+            const requestSelect = document.getElementById('requestCategory');
+            const transactionSelect = document.getElementById('transactionCategory');
+
+            [requestSelect, transactionSelect].forEach(select => {
+                if (select) {
+                    select.innerHTML = '<option value="">Selecione...</option>';
+                    categoriesSnapshot.forEach(doc => {
+                        const option = document.createElement('option');
+                        option.value = doc.data().name;
+                        option.textContent = doc.data().name;
+                        select.appendChild(option);
+                    });
+                }
+            });
+
+            // Populate list (admin)
+            const container = document.getElementById('categoriesList');
+            if (!container) return;
+
+            if (categoriesSnapshot.empty) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <span class="material-icons">category</span>
+                        </div>
+                        <h3>Nenhuma categoria</h3>
+                        <p>Adicione categorias para organizar as despesas</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            categoriesSnapshot.forEach(doc => {
+                html += `
+                    <div class="list-item">
+                        <div class="list-item-info">
+                            <h4>${doc.data().name}</h4>
+                        </div>
+                        <div class="list-item-actions">
+                            <button class="action-btn btn-danger" onclick="deleteCategory('${doc.id}')">
+                                <span class="material-icons" style="font-size: 14px;">delete</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // New Category Form
+        const categoryForm = document.getElementById('newCategoryForm');
+        if (categoryForm) {
+            categoryForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const name = document.getElementById('categoryName').value;
+
+                try {
+                    await db.collection('categories').add({ name });
+                    alert('Categoria adicionada com sucesso!');
+                    document.getElementById('newCategoryForm').reset();
+                    loadCategories();
+                } catch (error) {
+                    alert('Erro ao adicionar categoria: ' + error.message);
+                }
+            });
+        }
+
+        // Delete Category
+        async function deleteCategory(categoryId) {
+            if (confirm('Tem certeza que deseja excluir esta categoria?')) {
+                try {
+                    await db.collection('categories').doc(categoryId).delete();
+                    alert('Categoria excluída com sucesso!');
+                    loadCategories();
+                } catch (error) {
+                    alert('Erro ao excluir categoria: ' + error.message);
+                }
+            }
+        }
+
+        // Load Users
+        async function loadUsers() {
+            const usersSnapshot = await db.collection('users').orderBy('name').get();
+            const container = document.getElementById('usersList');
+
+            if (usersSnapshot.empty) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <span class="material-icons">people</span>
+                        </div>
+                        <h3>Nenhum usuário</h3>
+                        <p>Adicione usuários para acessar o sistema</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            usersSnapshot.forEach(doc => {
+                const data = doc.data();
+                html += `
+                    <div class="list-item">
+                        <div class="list-item-info">
+                            <h4>${data.name}</h4>
+                            <p>${data.email} • ${data.role === 'admin' ? 'Administrador' : 'Membro'}</p>
+                        </div>
+                        <div class="list-item-actions">
+                            <button class="action-btn btn-danger" onclick="deleteUser('${doc.id}')">
+                                <span class="material-icons" style="font-size: 14px;">delete</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // New User Form
+        const userForm = document.getElementById('newUserForm');
+        if (userForm) {
+            userForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const name = document.getElementById('newUserName').value;
+                const email = document.getElementById('newUserEmail').value;
+                const password = document.getElementById('newUserPassword').value;
+                const role = document.getElementById('newUserRole').value;
+
+                try {
+                    document.getElementById('loading').classList.add('active');
+
+                    // Create user in Firebase Auth
+                    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+
+                    // Add user data to Firestore
+                    await db.collection('users').doc(userCredential.user.uid).set({
+                        name,
+                        email,
+                        role
+                    });
+
+                    // Sign out the newly created user and sign back in as admin
+                    await auth.signOut();
+                    
+                    // Nota: O fluxo abaixo é complexo e requer senha do admin.
+                    // Em um ambiente de produção, use Admin SDK ou Cloud Functions.
+                    // Para o protótipo, voltamos ao login.
+                    alert('Usuário criado com sucesso! Faça login novamente com sua conta admin.');
+                    
+                    document.getElementById('newUserForm').reset();
+                    loadUsers();
+                    showLogin(); // Força o retorno ao login.
+
+                } catch (error) {
+                    alert('Erro ao criar usuário: ' + error.message);
+                } finally {
+                    document.getElementById('loading').classList.remove('active');
+                }
+            });
+        }
+
+        // Delete User
+        async function deleteUser(userId) {
+            if (confirm('Tem certeza que deseja excluir este usuário?')) {
+                try {
+                    await db.collection('users').doc(userId).delete();
+                    alert('Usuário excluído com sucesso!');
+                    loadUsers();
+                } catch (error) {
+                    alert('Erro ao excluir usuário: ' + error.message);
+                }
+            }
+        }
+
+        // Load Cash Flow Transactions (Antiga loadFixedBills)
+        async function loadCashFlow() {
+            const transactionsSnapshot = await db.collection('transactions').orderBy('transactionDate', 'desc').get();
+            const container = document.getElementById('cashFlowList');
+
+            if (!container) return;
+
+            if (transactionsSnapshot.empty) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <span class="material-icons">receipt_long</span>
+                        </div>
+                        <h3>Nenhum lançamento</h3>
+                        <p>Registre entradas e saídas de caixa</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<table><thead><tr><th>Título</th><th>Categoria</th><th>Valor</th><th>Data</th><th>Movimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>';
+
+            transactionsSnapshot.forEach(doc => {
+                const data = doc.data();
+                const direction = data.direction || 'out';
+                const directionIcon = direction === 'in' ? '💰' : '💸';
+                
+                html += `
+                    <tr>
+                        <td>${data.title}</td>
+                        <td>${data.category}</td>
+                        <td>${formatCurrency(data.value)}</td>
+                        <td>${new Date(data.transactionDate).toLocaleDateString('pt-BR')}</td>
+                        <td>${directionIcon} ${direction === 'in' ? 'Entrada' : 'Saída'}</td>
+                        <td><span class="status-badge status-${data.status}">${getStatusLabel(data.status)}</span></td>
+                        <td>
+                            <button class="action-btn" style="background: #10b981; color: white;" onclick="updateTransactionStatus('${doc.id}', 'paid')">
+                                <span class="material-icons" style="font-size: 14px;">check</span>
+                            </button>
+                            <button class="action-btn btn-danger" onclick="deleteTransaction('${doc.id}')">
+                                <span class="material-icons" style="font-size: 14px;">delete</span>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // New Cash Flow Form (Antigo newFixedBillForm)
+        const cashFlowForm = document.getElementById('newCashFlowForm');
+        if (cashFlowForm) {
+            cashFlowForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const direction = document.getElementById('transactionDirection').value;
+                const title = document.getElementById('transactionTitle').value;
+                const category = document.getElementById('transactionCategory').value;
+                const value = parseFloat(document.getElementById('transactionValue').value);
+                const transactionDate = document.getElementById('transactionDate').value; // Formato YYYY-MM-DD
+
+                try {
+                    await db.collection('transactions').add({
+                        title,
+                        category,
+                        value,
+                        transactionDate,
+                        direction,
+                        status: 'paid', // Status 'paid' para lançamentos de caixa diretos (pode ser ajustado)
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    alert('Lançamento registrado com sucesso!');
+                    document.getElementById('newCashFlowForm').reset();
+                    loadCashFlow();
+                    loadDashboard(); 
+                } catch (error) {
+                    alert('Erro ao registrar lançamento: ' + error.message);
+                }
+            });
+        }
         
-        <div id="sidebar" class="fixed inset-y-0 left-0 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out bg-white w-64 p-4 shadow-xl z-30 flex flex-col">
-            <div class="flex-shrink-0 mb-8">
-                <h2 class="text-2xl font-extrabold text-indigo-600 flex items-center">
-                    <i data-lucide="brain-circuit" class="w-7 h-7 mr-2"></i> PsychoPro
-                </h2>
-            </div>
-            <nav class="flex-grow space-y-2">
-                <button onclick="navigateTo('dashboard')" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-indigo-50 transition font-medium">
-                    <i data-lucide="layout-dashboard" class="w-5 h-5 mr-3"></i> Dashboard
-                </button>
-                <button onclick="navigateTo('patients')" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-indigo-50 transition font-medium">
-                    <i data-lucide="users" class="w-5 h-5 mr-3"></i> Pacientes
-                </button>
-                <button onclick="navigateTo('agenda')" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-indigo-50 transition font-medium">
-                    <i data-lucide="calendar" class="w-5 h-5 mr-3"></i> Agenda
-                </button>
-                <button onclick="navigateTo('finance')" class="w-full flex items-center p-3 rounded-xl text-gray-700 hover:bg-indigo-50 transition font-medium">
-                    <i data-lucide="wallet" class="w-5 h-5 mr-3"></i> Financeiro
-                </button>
-            </nav>
-            <div class="mt-auto pt-4 border-t">
-                <button onclick="handleLogout()" class="w-full flex items-center p-3 rounded-xl text-red-500 hover:bg-red-50 transition font-medium">
-                    <i data-lucide="log-out" class="w-5 h-5 mr-3"></i> Sair
-                </button>
-            </div>
-        </div>
+        // Update Transaction Status (Antiga updateBillStatus)
+        async function updateTransactionStatus(transactionId, status) {
+            if (!confirm(`Tem certeza que deseja marcar este lançamento como '${getStatusLabel(status)}'?`)) {
+                return;
+            }
+            try {
+                await db.collection('transactions').doc(transactionId).update({ status });
+                alert('Status do lançamento atualizado com sucesso!');
+                loadCashFlow();
+                loadDashboard();
+            } catch (error) {
+                alert('Erro ao atualizar status do lançamento: ' + error.message);
+            }
+        }
 
-        <div class="flex-1 lg:ml-64 bg-gray-50 overflow-y-auto">
-            <header class="lg:hidden bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-20">
-                <button onclick="toggleSidebar()" class="p-2 text-indigo-600 hover:bg-gray-100 rounded-full">
-                    <i data-lucide="menu" class="w-6 h-6"></i>
-                </button>
-                <h1 class="text-xl font-bold text-indigo-600">PsychoPro</h1>
-                <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">PS</div>
-            </header>
+        // Delete Transaction (Antiga deleteBill)
+        async function deleteTransaction(transactionId) {
+            if (confirm('Tem certeza que deseja excluir este lançamento de caixa?')) {
+                try {
+                    await db.collection('transactions').doc(transactionId).delete();
+                    alert('Lançamento excluído com sucesso!');
+                    loadCashFlow();
+                    loadDashboard();
+                } catch (error) {
+                    alert('Erro ao excluir lançamento: ' + error.message);
+                }
+            }
+        }
+        
+        // Helper function for currency formatting
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+        }
 
-            <main id="app-content" class="p-0 pb-20"></main>
+        // Helper function to capitalize first letter
+        function capitalizeFirst(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
 
-            <div class="fixed bottom-0 left-0 right-0 lg:hidden bg-white border-t shadow-2xl z-20">
-                <div class="flex justify-around items-center h-16">
-                    <button onclick="navigateTo('dashboard')" class="text-indigo-600 flex flex-col items-center p-2">
-                        <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
-                        <span class="text-xs">Início</span>
-                    </button>
-                    <button onclick="navigateTo('patients')" class="text-gray-500 hover:text-indigo-600 flex flex-col items-center p-2">
-                        <i data-lucide="users" class="w-6 h-6"></i>
-                        <span class="text-xs">Pacientes</span>
-                    </button>
-                    <button onclick="showAppointmentModal()" class="p-3 bg-indigo-500 text-white rounded-full shadow-lg -mt-4 transform transition-transform hover:scale-105">
-                        <i data-lucide="calendar-plus" class="w-7 h-7"></i>
-                    </button>
-                    <button onclick="navigateTo('agenda')" class="text-gray-500 hover:text-indigo-600 flex flex-col items-center p-2">
-                        <i data-lucide="calendar" class="w-6 h-6"></i>
-                        <span class="text-xs">Agenda</span>
-                    </button>
-                    <button onclick="handleLogout()" class="text-gray-500 hover:text-red-600 flex flex-col items-center p-2">
-                        <i data-lucide="log-out" class="w-6 h-6"></i>
-                        <span class="text-xs">Sair</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="general-modal" onclick="if(event.target.id === 'general-modal') closeModal()" class="hidden fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center transition-opacity duration-300 opacity-0">
-        <div class="bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto transform transition-all duration-300 translate-y-0 sm:translate-y-0">
-            <div class="flex justify-between items-center p-5 border-b sticky top-0 bg-white z-10">
-                <h3 id="general-modal-title" class="text-xl font-bold text-gray-800">Modal Title</h3>
-                <button onclick="closeModal()" class="p-2 text-gray-500 hover:bg-gray-100 rounded-full">
-                    <i data-lucide="x" class="w-6 h-6"></i>
-                </button>
-            </div>
-            <div id="general-modal-content" class="p-6">
-                </div>
-        </div>
-    </div>
-
-    <div id="confirmation-modal" onclick="if(event.target.id === 'confirmation-modal') closeModal('confirmation-modal')" class="hidden fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center transition-opacity duration-300 opacity-0">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 transform transition-all duration-300">
-            <h3 id="confirmation-modal-title" class="text-xl font-bold text-red-600 mb-4">Confirmar Ação</h3>
-            <div id="confirmation-modal-content">
-                </div>
-        </div>
-    </div>
-
+        // Helper function to get status label
+        function getStatusLabel(status) {
+            switch (status) {
+                case 'pending': return 'Aguardando';
+                case 'approved': return 'Aprovado';
+                case 'paid': return 'Pago';
+                case 'reimbursed': return 'Ressarcido';
+                case 'denied': return 'Negado';
+                default: return capitalizeFirst(status);
+            }
+        }
+    </script>
 </body>
 </html>
