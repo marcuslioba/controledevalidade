@@ -77,15 +77,15 @@
     <div class="logo">Financeiro Igreja</div>
     <button class="menu-toggle" aria-label="Abrir menu">☰</button>
     <ul class="nav-links" role="navigation" aria-label="Menu principal">
-      <li><a href="dashboard.html">Dashboard</a></li>
-      <li><a href="categorias.html">Categorias</a></li>
-      <li><a href="chamados.html" class="active">Chamados</a></li>
-      <li><a href="financas.html">Financeiro</a></li>
-      <li id="admin-menu-item" style="display:none;"><a href="usuarios.html">Usuários</a></li>
+    <li><a href="dashboard.html">Dashboard</a></li>
+    <li><a href="categorias.html">Categorias</a></li>
+    <li><a href="chamados.html" class="active">Chamados</a></li>
+    <li><a href="financas.html">Financeiro</a></li>
+    <li id="admin-menu-item" style="display:none;"><a href="usuarios.html">Usuários</a></li>
     </ul>
     <div class="user-section">
-      <img src="https://placehold.co/100" alt="Foto do Usuário" class="user-photo" id="user-photo-img">
-      <button class="logout-btn" id="logout-btn">Sair</button>
+    <img src="https://placehold.co/100" alt="Foto do Usuário" class="user-photo" id="user-photo-img">
+    <button class="logout-btn" id="logout-btn">Sair</button>
     </div>
   </div>
 </nav>
@@ -99,38 +99,38 @@
   <section id="new-call-section">
     <h2>Novo Chamado</h2>
     <div class="form-group">
-      <label for="call-name">Nome</label>
-      <input type="text" id="call-name" placeholder="Nome do chamado" />
+    <label for="call-name">Nome</label>
+    <input type="text" id="call-name" placeholder="Nome do chamado" />
     </div>
     <div class="form-group">
-      <label for="call-category">Categoria</label>
-      <select id="call-category">
-        <option value="">Selecione uma categoria</option>
-        <option value="infra">Infraestrutura</option>
-        <option value="culto">Culto</option>
-        <option value="eventos">Eventos</option>
-        <option value="administrativo">Administrativo</option>
-        <option value="caridade">Caridade</option>
-      </select>
+    <label for="call-category">Categoria</label>
+    <select id="call-category">
+    <option value="">Selecione uma categoria</option>
+    <option value="infra">Infraestrutura</option>
+    <option value="culto">Culto</option>
+    <option value="eventos">Eventos</option>
+    <option value="administrativo">Administrativo</option>
+    <option value="caridade">Caridade</option>
+    </select>
     </div>
     <div class="form-group">
-      <label for="call-value">Valor (R$)</label>
-      <input type="text" id="call-value" placeholder="R$ 0,00" inputmode="numeric" />
+    <label for="call-value">Valor (R$)</label>
+    <input type="text" id="call-value" placeholder="R$ 0,00" inputmode="numeric" />
     </div>
     <div class="form-group">
-      <label for="call-notes">Observações</label>
-      <textarea id="call-notes" rows="3" placeholder="Observações sobre o chamado"></textarea>
+    <label for="call-notes">Observações</label>
+    <textarea id="call-notes" rows="3" placeholder="Observações sobre o chamado"></textarea>
     </div>
     <div class="form-group">
-      <label for="call-priority">Prioridade</label>
-      <select id="call-priority">
-        <option value="low">Baixa</option>
-        <option value="medium">Média</option>
-        <option value="high">Alta</option>
-      </select>
+    <label for="call-priority">Prioridade</label>
+    <select id="call-priority">
+    <option value="low">Baixa</option>
+    <option value="medium">Média</option>
+    <option value="high">Alta</option>
+    </select>
     </div>
     <div class="actions">
-      <button id="create-call-btn">Criar Chamado</button>
+    <button id="create-call-btn">Criar Chamado</button>
     </div>
   </section>
 
@@ -138,20 +138,20 @@
   <section>
     <h2>Meus Chamados</h2>
     <table>
-      <thead>
-        <tr>
-          <th>Nome</th>
-          <th>Categoria</th>
-          <th>Valor</th>
-          <th>Prioridade</th>
-          <th>Status</th>
-          <th>Data</th>
-          <th>Ações</th>
-        </tr>
-      </thead>
-      <tbody id="calls-table-body">
-        <!-- Chamados serão listados aqui -->
-      </tbody>
+    <thead>
+    <tr>
+    <th>Nome</th>
+    <th>Categoria</th>
+    <th>Valor</th>
+    <th>Prioridade</th>
+    <th>Status</th>
+    <th>Data</th>
+    <th>Ações</th>
+    </tr>
+    </thead>
+    <tbody id="calls-table-body">
+    <!-- Chamados serão listados aqui -->
+    </tbody>
     </table>
     <div id="no-calls" style="display:none; padding:12px; background:#fffbe6; border-radius:6px; margin-top:12px;">Nenhum chamado encontrado.</div>
   </section>
@@ -162,17 +162,29 @@
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="status-modal-title">
     <h3 id="status-modal-title">Alterar Status</h3>
     <div class="form-group">
-      <label for="new-status">Novo Status</label>
-      <select id="new-status">
-        <option value="pending">Pendente</option>
-        <option value="approved">Aprovado</option>
-        <option value="paid">Pago</option>
-        <option value="denied">Negado</option>
-      </select>
+    <label for="new-status">Novo Status</label>
+    <select id="new-status">
+    <option value="pending">Pendente</option>
+    <option value="approved">Aprovado</option>
+    <option value="paid">Pago</option>
+    <option value="denied">Negado</option>
+    </select>
     </div>
     <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
-      <button id="save-status-btn">Salvar</button>
-      <button id="cancel-status-btn" class="danger">Cancelar</button>
+    <button id="save-status-btn">Salvar</button>
+    <button id="cancel-status-btn" class="danger">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para confirmar exclusão -->
+<div id="delete-modal" class="hidden" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+    <h3 id="delete-modal-title">Confirmar Exclusão</h3>
+    <p>Tem certeza que deseja excluir este chamado? Esta ação não pode ser desfeita.</p>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+    <button id="confirm-delete-btn" class="danger">Excluir</button>
+    <button id="cancel-delete-btn">Cancelar</button>
     </div>
   </div>
 </div>
@@ -202,8 +214,11 @@
   const callsTableBody = document.getElementById('calls-table-body');
   const createCallBtn = document.getElementById('create-call-btn');
   const statusModal = document.getElementById('status-modal');
+  const deleteModal = document.getElementById('delete-modal');
   const saveStatusBtn = document.getElementById('save-status-btn');
   const cancelStatusBtn = document.getElementById('cancel-status-btn');
+  const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+  const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
   const newCallSection = document.getElementById('new-call-section');
   const callValueInput = document.getElementById('call-value');
   const noCallsEl = document.getElementById('no-calls');
@@ -221,7 +236,7 @@
     notification.className = `notification ${type}`;
     notification.style.display = 'block';
     if (!options.sticky) {
-      setTimeout(() => { notification.style.display = 'none'; }, 7000);
+    setTimeout(() => { notification.style.display = 'none'; }, 7000);
     }
   }
 
@@ -271,26 +286,42 @@
     const rounded = Math.round(valueNum * 100) / 100;
 
     try {
-      await db.collection('calls').add({
-        userId: currentUser.uid,
-        userName: currentUser.email || '',
-        name: name,
-        category: category,
-        value: rounded,
-        notes: notes,
-        priority: priority,
-        status: 'pending',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      showNotification('Chamado criado com sucesso!', 'success');
-      // clear form
-      document.getElementById('call-name').value = '';
-      document.getElementById('call-category').value = '';
-      document.getElementById('call-value').value = '';
-      document.getElementById('call-notes').value = '';
-      document.getElementById('call-priority').value = 'low';
+    await db.collection('calls').add({
+    userId: currentUser.uid,
+    userName: currentUser.email || '',
+    name: name,
+    category: category,
+    value: rounded,
+    notes: notes,
+    priority: priority,
+    status: 'pending',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showNotification('Chamado criado com sucesso!', 'success');
+    // clear form
+    document.getElementById('call-name').value = '';
+    document.getElementById('call-category').value = '';
+    document.getElementById('call-value').value = '';
+    document.getElementById('call-notes').value = '';
+    document.getElementById('call-priority').value = 'low';
     } catch (error) {
-      showNotification(`Erro: ${error.message}`, 'error');
+    showNotification(`Erro: ${error.message}`, 'error');
+    }
+  }
+
+  // Delete call
+  async function deleteCall(callId) {
+    if (!callId) {
+      showNotification('ID do chamado não encontrado.', 'error');
+      return;
+    }
+    
+    try {
+      await db.collection('calls').doc(callId).delete();
+      showNotification('Chamado excluído com sucesso!', 'success');
+      closeDeleteModal();
+    } catch (error) {
+      showNotification(`Erro ao excluir chamado: ${error.message}`, 'error');
     }
   }
 
@@ -298,50 +329,59 @@
   function renderCallsFromDocs(docsArray) {
     callsTableBody.innerHTML = '';
     if (!docsArray || docsArray.length === 0) {
-      noCallsEl.style.display = 'block';
-      return;
+    noCallsEl.style.display = 'block';
+    return;
     } else {
-      noCallsEl.style.display = 'none';
+    noCallsEl.style.display = 'none';
     }
 
     docsArray.forEach(doc => {
-      const call = doc.data ? doc.data() : doc; // if it's a doc snapshot or plain object
-      const id = (doc.id) ? doc.id : (doc._id || '');
-      const valueToShow = (typeof call.value === 'number') ? call.value : (parseCurrencyInput(String(call.value || '0')) || 0);
+    const call = doc.data ? doc.data() : doc; // if it's a doc snapshot or plain object
+    const id = (doc.id) ? doc.id : (doc._id || '');
+    const valueToShow = (typeof call.value === 'number') ? call.value : (parseCurrencyInput(String(call.value || '0')) || 0);
 
-      // Format createdAt
-      let createdAtFormatted = '—';
-      const createdAt = call.createdAt;
-      if (createdAt && typeof createdAt.toDate === 'function') {
-        createdAtFormatted = createdAt.toDate().toLocaleDateString('pt-BR');
-      } else if (createdAt && (typeof createdAt === 'number' || createdAt instanceof Date)) {
-        const d = (createdAt instanceof Date) ? createdAt : new Date(createdAt);
-        createdAtFormatted = d.toLocaleDateString('pt-BR');
-      }
+    // Format createdAt
+    let createdAtFormatted = '—';
+    const createdAt = call.createdAt;
+    if (createdAt && typeof createdAt.toDate === 'function') {
+    createdAtFormatted = createdAt.toDate().toLocaleDateString('pt-BR');
+    } else if (createdAt && (typeof createdAt === 'number' || createdAt instanceof Date)) {
+    const d = (createdAt instanceof Date) ? createdAt : new Date(createdAt);
+    createdAtFormatted = d.toLocaleDateString('pt-BR');
+    }
 
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${call.name || ''}</td>
-        <td>${getCategoryName(call.category)}</td>
-        <td>${currencyFormatter.format(valueToShow)}</td>
-        <td class="${getPriorityClass(call.priority)}">${getPriorityText(call.priority)}</td>
-        <td><span class="status-${call.status}">${getStatusText(call.status)}</span></td>
-        <td>${createdAtFormatted}</td>
-        <td>
-          ${ currentUserRole === 'admin' ? `<button data-id="${id}" class="change-status">Alterar Status</button>` : '' }
-        </td>
-      `;
-      // store id for later
-      tr.querySelector('td').setAttribute('data-doc-id', id);
-      callsTableBody.appendChild(tr);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+    <td>${call.name || ''}</td>
+    <td>${getCategoryName(call.category)}</td>
+    <td>${currencyFormatter.format(valueToShow)}</td>
+    <td class="${getPriorityClass(call.priority)}">${getPriorityText(call.priority)}</td>
+    <td><span class="status-${call.status}">${getStatusText(call.status)}</span></td>
+    <td>${createdAtFormatted}</td>
+    <td>
+    ${ currentUserRole === 'admin' ? 
+       `<button data-id="${id}" class="change-status">Alterar Status</button>
+        <button data-id="${id}" class="delete-call danger">Excluir</button>` : 
+       '' }
+    </td>
+    `;
+    // store id for later
+    tr.querySelector('td').setAttribute('data-doc-id', id);
+    callsTableBody.appendChild(tr);
     });
 
     // Attach admin buttons if any
     if (currentUserRole === 'admin') {
-      document.querySelectorAll('.change-status').forEach(btn => {
-        btn.removeEventListener('click', onChangeStatusClick);
-        btn.addEventListener('click', onChangeStatusClick);
-      });
+    document.querySelectorAll('.change-status').forEach(btn => {
+    btn.removeEventListener('click', onChangeStatusClick);
+    btn.addEventListener('click', onChangeStatusClick);
+    });
+    
+    // Adiciona eventos para os botões de exclusão
+    document.querySelectorAll('.delete-call').forEach(btn => {
+    btn.removeEventListener('click', onDeleteCallClick);
+    btn.addEventListener('click', onDeleteCallClick);
+    });
     }
   }
 
@@ -349,8 +389,8 @@
   function loadCalls() {
     // remove previous listener if exists
     if (unsubscribeCalls) {
-      unsubscribeCalls();
-      unsubscribeCalls = null;
+    unsubscribeCalls();
+    unsubscribeCalls = null;
     }
 
     callsTableBody.innerHTML = '';
@@ -360,102 +400,112 @@
     let query = db.collection('calls');
 
     if (currentUserRole !== 'admin') {
-      query = query.where('userId', '==', currentUser.uid);
+    query = query.where('userId', '==', currentUser.uid);
     }
 
     // We attempt to listen with orderBy; this may require a composite index if where + orderBy used.
     try {
-      unsubscribeCalls = query.orderBy('createdAt', 'desc').onSnapshot(snapshot => {
-        // convert snapshot to array and render
-        const docs = snapshot.docs;
-        if (!docs.length) {
-          renderCallsFromDocs([]);
-          return;
-        }
-        renderCallsFromDocs(docs);
-      }, err => {
-        // If the error indicates a missing index, show link and fallback
-        console.error('onSnapshot error:', err);
-        if (err && /requires an index/i.test(err.message || '')) {
-          // extract link from message if present
-          const urlMatch = (err.message || '').match(/https?:\/\/console\.firebase\.google\.com[^\s)]+/);
-          const createIndexUrl = urlMatch ? urlMatch[0] : null;
-          const linkHtml = createIndexUrl ? `<br/><a href="${createIndexUrl}" target="_blank" rel="noopener">Criar índice necessário no Console do Firebase</a>` : '';
-          showNotification(`A consulta requer um índice no Firestore. ${linkHtml}`, 'error', { sticky: true });
+    unsubscribeCalls = query.orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+    // convert snapshot to array and render
+    const docs = snapshot.docs;
+    if (!docs.length) {
+    renderCallsFromDocs([]);
+    return;
+    }
+    renderCallsFromDocs(docs);
+    }, err => {
+    // If the error indicates a missing index, show link and fallback
+    console.error('onSnapshot error:', err);
+    if (err && /requires an index/i.test(err.message || '')) {
+    // extract link from message if present
+    const urlMatch = (err.message || '').match(/https?:\/\/console\.firebase\.google\.com[^\s)]+/);
+    const createIndexUrl = urlMatch ? urlMatch[0] : null;
+    const linkHtml = createIndexUrl ? `<br/><a href="${createIndexUrl}" target="_blank" rel="noopener">Criar índice necessário no Console do Firebase</a>` : '';
+    showNotification(`A consulta requer um índice no Firestore. ${linkHtml}`, 'error', { sticky: true });
 
-          // Fallback: fetch user's calls without orderBy (or with single where) and sort client-side
-          if (currentUserRole !== 'admin') {
-            db.collection('calls').where('userId', '==', currentUser.uid).get().then(snapshot => {
-              const docs = snapshot.docs.slice();
-              // sort by createdAt descending in client (docs without createdAt go to end)
-              docs.sort((a, b) => {
-                const aTS = (a.data().createdAt && typeof a.data().createdAt.toDate === 'function') ? a.data().createdAt.toDate().getTime() : 0;
-                const bTS = (b.data().createdAt && typeof b.data().createdAt.toDate === 'function') ? b.data().createdAt.toDate().getTime() : 0;
-                return bTS - aTS;
-              });
-              renderCallsFromDocs(docs);
-            }).catch(err2 => {
-              console.error('Fallback get() error:', err2);
-              showNotification(`Erro ao carregar chamados (fallback): ${err2.message}`, 'error');
-            });
-          } else {
-            // admin fallback: try simple get() ordered client-side
-            db.collection('calls').get().then(snapshot => {
-              const docs = snapshot.docs.slice();
-              docs.sort((a,b) => {
-                const aTS = (a.data().createdAt && typeof a.data().createdAt.toDate === 'function') ? a.data().createdAt.toDate().getTime() : 0;
-                const bTS = (b.data().createdAt && typeof b.data().createdAt.toDate === 'function') ? b.data().createdAt.toDate().getTime() : 0;
-                return bTS - aTS;
-              });
-              renderCallsFromDocs(docs);
-              showNotification('Consulta carregada via fallback. Crie o índice para usar realtime queries com ordenação.', 'warning');
-            }).catch(err2 => {
-              console.error('Fallback admin get() error:', err2);
-              showNotification(`Erro ao carregar chamados: ${err2.message}`, 'error');
-            });
-          }
-        } else {
-          showNotification(`Erro ao carregar chamados: ${err.message || err}`, 'error');
-        }
-      });
+    // Fallback: fetch user's calls without orderBy (or with single where) and sort client-side
+    if (currentUserRole !== 'admin') {
+    db.collection('calls').where('userId', '==', currentUser.uid).get().then(snapshot => {
+    const docs = snapshot.docs.slice();
+    // sort by createdAt descending in client (docs without createdAt go to end)
+    docs.sort((a, b) => {
+    const aTS = (a.data().createdAt && typeof a.data().createdAt.toDate === 'function') ? a.data().createdAt.toDate().getTime() : 0;
+    const bTS = (b.data().createdAt && typeof b.data().createdAt.toDate === 'function') ? b.data().createdAt.toDate().getTime() : 0;
+    return bTS - aTS;
+    });
+    renderCallsFromDocs(docs);
+    }).catch(err2 => {
+    console.error('Fallback get() error:', err2);
+    showNotification(`Erro ao carregar chamados (fallback): ${err2.message}`, 'error');
+    });
+    } else {
+    // admin fallback: try simple get() ordered client-side
+    db.collection('calls').get().then(snapshot => {
+    const docs = snapshot.docs.slice();
+    docs.sort((a,b) => {
+    const aTS = (a.data().createdAt && typeof a.data().createdAt.toDate === 'function') ? a.data().createdAt.toDate().getTime() : 0;
+    const bTS = (b.data().createdAt && typeof b.data().createdAt.toDate === 'function') ? b.data().createdAt.toDate().getTime() : 0;
+    return bTS - aTS;
+    });
+    renderCallsFromDocs(docs);
+    showNotification('Consulta carregada via fallback. Crie o índice para usar realtime queries com ordenação.', 'warning');
+    }).catch(err2 => {
+    console.error('Fallback admin get() error:', err2);
+    showNotification(`Erro ao carregar chamados: ${err2.message}`, 'error');
+    });
+    }
+    } else {
+    showNotification(`Erro ao carregar chamados: ${err.message || err}`, 'error');
+    }
+    });
     } catch (ex) {
-      console.error('loadCalls exception:', ex);
-      showNotification('Erro ao iniciar escuta de chamados: ' + (ex.message || ex), 'error');
+    console.error('loadCalls exception:', ex);
+    showNotification('Erro ao iniciar escuta de chamados: ' + (ex.message || ex), 'error');
     }
   }
 
   function onChangeStatusClick(e) {
     if (currentUserRole !== 'admin') {
-      showNotification('Você não tem permissão para alterar o status.', 'error');
-      return;
+    showNotification('Você não tem permissão para alterar o status.', 'error');
+    return;
     }
     const id = e.currentTarget.getAttribute('data-id');
     currentCallId = id;
     db.collection('calls').doc(id).get().then(doc => {
-      if (doc.exists) {
-        const data = doc.data();
-        const sel = document.getElementById('new-status');
-        if (sel && data.status) sel.value = data.status;
-      }
-      openStatusModal();
+    if (doc.exists) {
+    const data = doc.data();
+    const sel = document.getElementById('new-status');
+    if (sel && data.status) sel.value = data.status;
+    }
+    openStatusModal();
     }).catch(err => {
-      showNotification(`Erro ao abrir chamado: ${err.message}`, 'error');
+    showNotification(`Erro ao abrir chamado: ${err.message}`, 'error');
     });
+  }
+
+  function onDeleteCallClick(e) {
+    if (currentUserRole !== 'admin') {
+      showNotification('Você não tem permissão para excluir chamados.', 'error');
+      return;
+    }
+    const id = e.currentTarget.getAttribute('data-id');
+    currentCallId = id;
+    openDeleteModal();
   }
 
   async function changeCallStatus(callId, newStatus) {
     try {
-      await db.collection('calls').doc(callId).update({ status: newStatus });
-      if (newStatus === 'paid') {
-        if (confirm('Deseja adicionar esta despesa como conta paga no controle financeiro?')) {
-          showNotification('Despesa adicionada como conta paga!');
-          // TODO: integrar com coleção de finanças (ex.: db.collection('contas').add({...}))
-        }
-      }
-      showNotification('Status atualizado com sucesso!', 'success');
-      closeStatusModal();
+    await db.collection('calls').doc(callId).update({ status: newStatus });
+    if (newStatus === 'paid') {
+    if (confirm('Deseja adicionar esta despesa como conta paga no controle financeiro?')) {
+    showNotification('Despesa adicionada como conta paga!');
+    // TODO: integrar com coleção de finanças (ex.: db.collection('contas').add({...}))
+    }
+    }
+    showNotification('Status atualizado com sucesso!', 'success');
+    closeStatusModal();
     } catch (error) {
-      showNotification(`Erro: ${error.message}`, 'error');
+    showNotification(`Erro: ${error.message}`, 'error');
     }
   }
 
@@ -464,10 +514,24 @@
     statusModal.style.display = 'flex';
     statusModal.setAttribute('aria-hidden', 'false');
   }
+  
   function closeStatusModal() {
     statusModal.classList.add('hidden');
     statusModal.style.display = 'none';
     statusModal.setAttribute('aria-hidden', 'true');
+    currentCallId = null;
+  }
+  
+  function openDeleteModal() {
+    deleteModal.classList.remove('hidden');
+    deleteModal.style.display = 'flex';
+    deleteModal.setAttribute('aria-hidden', 'false');
+  }
+  
+  function closeDeleteModal() {
+    deleteModal.classList.add('hidden');
+    deleteModal.style.display = 'none';
+    deleteModal.setAttribute('aria-hidden', 'true');
     currentCallId = null;
   }
 
@@ -480,8 +544,8 @@
     const priority = document.getElementById('call-priority').value;
 
     if (!name || !category || !value) {
-      showNotification('Preencha nome, categoria e valor.', 'error');
-      return;
+    showNotification('Preencha nome, categoria e valor.', 'error');
+    return;
     }
     createCall(name, category, value, notes, priority);
   });
@@ -490,11 +554,21 @@
     const newStatus = document.getElementById('new-status').value;
     if (currentCallId) changeCallStatus(currentCallId, newStatus);
   });
+  
+  confirmDeleteBtn.addEventListener('click', () => {
+    if (currentCallId) deleteCall(currentCallId);
+  });
+  
   cancelStatusBtn.addEventListener('click', closeStatusModal);
+  cancelDeleteBtn.addEventListener('click', closeDeleteModal);
 
-  // Click outside modal closes it
+  // Click outside modals closes them
   statusModal.addEventListener('click', (e) => {
     if (e.target === statusModal) closeStatusModal();
+  });
+  
+  deleteModal.addEventListener('click', (e) => {
+    if (e.target === deleteModal) closeDeleteModal();
   });
 
   // Menu toggle and logout initialization (moved out of snapshot)
@@ -502,48 +576,48 @@
     const menuToggle = document.querySelector('.menu-toggle');
     const navLinks = document.querySelector('.nav-links');
     if (menuToggle && navLinks) {
-      menuToggle.addEventListener('click', () => navLinks.classList.toggle('show'));
-      document.querySelectorAll('.nav-links a').forEach(link => {
-        link.addEventListener('click', () => { if (navLinks.classList.contains('show')) navLinks.classList.remove('show'); });
-      });
+    menuToggle.addEventListener('click', () => navLinks.classList.toggle('show'));
+    document.querySelectorAll('.nav-links a').forEach(link => {
+    link.addEventListener('click', () => { if (navLinks.classList.contains('show')) navLinks.classList.remove('show'); });
+    });
     }
 
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
-      logoutBtn.addEventListener('click', () => {
-        auth.signOut().then(() => { window.location.href = 'index.html'; });
-      });
+    logoutBtn.addEventListener('click', () => {
+    auth.signOut().then(() => { window.location.href = 'index.html'; });
+    });
     }
   });
 
   // Auth state - show admin menu item and load calls
   auth.onAuthStateChanged(user => {
     if (user) {
-      currentUser = user;
-      db.collection('users').doc(user.uid).get().then(doc => {
-        currentUserRole = doc.exists ? (doc.data().role || 'member') : 'member';
-        // show/hide admin menu
-        const adminMenuItem = document.getElementById('admin-menu-item');
-        const userPhotoImg = document.getElementById('user-photo-img');
-        if (currentUserRole === 'admin') {
-          adminMenuItem.style.display = 'block';
-        } else {
-          adminMenuItem.style.display = 'none';
-        }
-        // set photo if present
-        if (user.photoURL) userPhotoImg.src = user.photoURL;
-
-        // Make sure new-call-section shown for authenticated users
-        newCallSection.classList.remove('hidden');
-
-        // load calls (will attempt realtime query and fallback if necessary)
-        loadCalls();
-      }).catch(err => {
-        showNotification(`Erro ao verificar usuário: ${err.message}`, 'error');
-      });
+    currentUser = user;
+    db.collection('users').doc(user.uid).get().then(doc => {
+    currentUserRole = doc.exists ? (doc.data().role || 'member') : 'member';
+    // show/hide admin menu
+    const adminMenuItem = document.getElementById('admin-menu-item');
+    const userPhotoImg = document.getElementById('user-photo-img');
+    if (currentUserRole === 'admin') {
+    adminMenuItem.style.display = 'block';
     } else {
-      // not authenticated -> redirect
-      window.location.href = 'index.html';
+    adminMenuItem.style.display = 'none';
+    }
+    // set photo if present
+    if (user.photoURL) userPhotoImg.src = user.photoURL;
+
+    // Make sure new-call-section shown for authenticated users
+    newCallSection.classList.remove('hidden');
+
+    // load calls (will attempt realtime query and fallback if necessary)
+    loadCalls();
+    }).catch(err => {
+    showNotification(`Erro ao verificar usuário: ${err.message}`, 'error');
+    });
+    } else {
+    // not authenticated -> redirect
+    window.location.href = 'index.html';
     }
   });
 
