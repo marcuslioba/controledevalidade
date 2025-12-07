@@ -236,17 +236,19 @@
   <h1>Cadastro de Contas a Pagar</h1>
 
   <form id="contaForm">
+    <label for="tipo">Tipo</label>
+    <select id="tipo" name="tipo" required>
+    <option value="">Selecione o tipo</option>
+    <option value="Entrada">Entrada</option>
+    <option value="Saída">Saída</option>
+    </select>
+
     <label for="nome">Nome da Conta</label>
     <input type="text" id="nome" name="nome" required />
 
     <label for="categoria">Categoria</label>
     <select id="categoria" name="categoria" required>
     <option value="">Selecione uma categoria</option>
-    <option value="Aluguel">Aluguel</option>
-    <option value="Energia">Energia</option>
-    <option value="Água">Água</option>
-    <option value="Internet">Internet</option>
-    <option value="Outros">Outros</option>
     </select>
 
     <label for="valor">Valor (R$)</label>
@@ -271,6 +273,7 @@
   <table id="contasTable">
     <thead>
     <tr>
+    <th>Tipo</th>
     <th>Nome</th>
     <th>Categoria</th>
     <th>Valor (R$)</th>
@@ -310,13 +313,14 @@ const firebaseConfig = {
   const contaForm = document.getElementById('contaForm');
   const contasTableBody = document.querySelector('#contasTable tbody');
   const valorInput = document.getElementById('valor');
+  const categoriaSelect = document.getElementById('categoria');
 
   // Função para formatar valor como moeda
   function formatarMoeda(valor) {
     const numero = parseFloat(valor.replace(/\D/g, '')) / 100;
     return numero.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    style: 'currency',
+    currency: 'BRL'
     });
   }
 
@@ -350,10 +354,11 @@ const firebaseConfig = {
     const tr = document.createElement('tr');
 
     tr.innerHTML = `
+    <td>${conta.tipo}</td>
     <td>${conta.nome}</td>
     <td>${conta.categoria}</td>
     <td>R$ ${parseFloat(conta.valor).toFixed(2).replace('.', ',')}</td>
-    <td>${conta.vencimento}</td>
+    <td>${conta.vencimento && conta.vencimento.seconds ? new Date(conta.vencimento.seconds * 1000).toLocaleDateString('pt-BR') : conta.vencimento}</td>
     <td class="status-${conta.status.toLowerCase()}">${conta.status}</td>
     <td>
     <button class="btn-small btn-edit" data-id="${doc.id}">Editar</button>
@@ -389,6 +394,7 @@ const firebaseConfig = {
     const conta = doc.data();
 
     // Preenche o formulário para edição
+    contaForm.tipo.value = conta.tipo;
     contaForm.nome.value = conta.nome;
     contaForm.categoria.value = conta.categoria;
     
@@ -396,7 +402,7 @@ const firebaseConfig = {
     const valorFormatado = parseFloat(conta.valor).toFixed(2).replace('.', '');
     valorInput.value = `R$ ${valorFormatado}`;
 
-    contaForm.vencimento.value = conta.vencimento;
+    contaForm.vencimento.value = conta.vencimento && conta.vencimento.seconds ? new Date(conta.vencimento.seconds * 1000).toISOString().substring(0, 10) : conta.vencimento;
     contaForm.observacoes.value = conta.observacoes;
     contaForm.status.value = conta.status;
 
@@ -406,8 +412,28 @@ const firebaseConfig = {
     });
   }
 
-  // Escuta alterações em tempo real
+  // Função para carregar categorias do Firestore e popular o select
+  async function carregarCategorias() {
+    try {
+      const snapshot = await db.collection('categories').orderBy('name').get();
+      categoriaSelect.innerHTML = '<option value="">Selecione uma categoria</option>';
+      snapshot.forEach(doc => {
+        const cat = doc.data();
+        const option = document.createElement('option');
+        option.value = cat.name;
+        option.textContent = cat.name;
+        categoriaSelect.appendChild(option);
+      });
+    } catch (error) {
+      console.error('Erro ao carregar categorias:', error);
+    }
+  }
+
+  // Escuta alterações em tempo real para contas
   contasRef.orderBy('vencimento').onSnapshot(renderizarContas);
+
+  // Chama carregar categorias ao carregar a página
+  carregarCategorias();
 
   // Envio do formulário
   contaForm.addEventListener('submit', async (e) => {
@@ -418,6 +444,7 @@ const firebaseConfig = {
     valorNumerico = valorNumerico.replace('R$', '').replace(/\./g, '').replace(',', '.');
 
     const contaData = {
+    tipo: contaForm.tipo.value,
     nome: contaForm.nome.value.trim(),
     categoria: contaForm.categoria.value,
     valor: parseFloat(valorNumerico),
@@ -468,35 +495,34 @@ const firebaseConfig = {
   // Verifica permissões do usuário
   auth.onAuthStateChanged(user => {
     if (user) {
-      const adminMenuItem = document.getElementById('admin-menu-item');
-      const userPhotoImg = document.getElementById('user-photo-img');
-      
-      db.collection('users').doc(user.uid).get().then(doc => {
-        if (doc.exists) {
-          const userData = doc.data();
-          const role = userData.role || 'member';
-          
-          // Mostra menu de usuários apenas para administradores
-          if(role === 'admin') {
-            adminMenuItem.style.display = 'block';
-          }
-          
-          // Carrega foto do usuário
-          if(userData.photoURL) {
-            userPhotoImg.src = userData.photoURL;
-          } else {
-            userPhotoImg.src = 'https://placehold.co/100';
-          }
-        }
-      }).catch(error => {
-        console.error("Erro ao obter dados do usuário:", error);
-      });
+    const adminMenuItem = document.getElementById('admin-menu-item');
+    const userPhotoImg = document.getElementById('user-photo-img');
+    
+    db.collection('users').doc(user.uid).get().then(doc => {
+    if (doc.exists) {
+    const userData = doc.data();
+    const role = userData.role || 'member';
+    
+    // Mostra menu de usuários apenas para administradores
+    if(role === 'admin') {
+    adminMenuItem.style.display = 'block';
+    }
+    
+    // Carrega foto do usuário
+    if(userData.photoURL) {
+    userPhotoImg.src = userData.photoURL;
     } else {
-      // Usuário não autenticado
-      window.location.href = 'index.html';
+    userPhotoImg.src = 'https://placehold.co/100';
+    }
+    }
+    }).catch(error => {
+    console.error("Erro ao obter dados do usuário:", error);
+    });
+    } else {
+    // Usuário não autenticado
+    window.location.href = 'index.html';
     }
   });
 </script>
-
 </body>
 </html>
