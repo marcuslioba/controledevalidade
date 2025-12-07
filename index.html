@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login - Sistema Financeiro Igreja</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #2575fc 0%, #6a11cb 100%);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .login-container {
+      display: flex;
+      width: 900px;
+      height: 500px;
+      background: white;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    }
+    
+    .left-panel {
+      flex: 1;
+      background: linear-gradient(135deg, #2575fc 0%, #6a11cb 100%);
+      color: white;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+    
+    .left-panel h1 {
+      font-size: 2.5rem;
+      margin-bottom: 20px;
+    }
+    
+    .left-panel p {
+      font-size: 1.1rem;
+      line-height: 1.6;
+      max-width: 350px;
+      opacity: 0.9;
+    }
+    
+    .right-panel {
+      flex: 1;
+      padding: 50px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    
+    .right-panel h2 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 2rem;
+    }
+    
+    .right-panel p {
+      color: #777;
+      margin-bottom: 30px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #555;
+    }
+    
+    input {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      font-size: 1rem;
+      transition: all 0.3s;
+    }
+    
+    input:focus {
+      border-color: #2575fc;
+      box-shadow: 0 0 0 3px rgba(37, 117, 252, 0.2);
+      outline: none;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-bottom: 15px;
+    }
+    
+    .btn-primary {
+      background: #2575fc;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #1a68e8;
+      transform: translateY(-2px);
+    }
+    
+    .btn-secondary {
+      background: #f0f2f5;
+      color: #555;
+    }
+    
+    .btn-secondary:hover {
+      background: #e4e6e9;
+    }
+    
+    .links {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+    }
+    
+    .links a {
+      color: #2575fc;
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    
+    .links a:hover {
+      text-decoration: underline;
+    }
+    
+    .notification {
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    
+    .notification.error {
+      background: #ffebee;
+      color: #c62828;
+      border: 1px solid #ffcdd2;
+    }
+    
+    .notification.success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #c8e6c9;
+    }
+    
+    .logo {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+    
+    @media (max-width: 768px) {
+      .login-container {
+        flex-direction: column;
+        height: auto;
+        width: 100%;
+      }
+      
+      .left-panel {
+        padding: 30px 20px;
+      }
+      
+      .right-panel {
+        padding: 30px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="left-panel">
+      <div class="logo">⛪</div>
+      <h1>Sistema Financeiro Igreja</h1>
+      <p>Gerencie finanças, chamados e categorias de forma simples e eficiente</p>
+    </div>
+    
+    <div class="right-panel">
+      <h2>Bem-vindo</h2>
+      <p>Faça login para acessar o sistema</p>
+      
+      <div id="notif" class="notification"></div>
+      
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input id="email" type="email" placeholder="seu@email.com" />
+      </div>
+      
+      <div class="form-group">
+        <label for="password">Senha</label>
+        <input id="password" type="password" placeholder="Senha" />
+      </div>
+      
+      <button id="loginBtn" class="btn btn-primary">Entrar</button>
+      <button id="signupBtn" class="btn btn-secondary">Criar Conta</button>
+      
+      <div class="links">
+        <a href="#" id="resetLink">Esqueci a senha</a>
+        <span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    // Configuração Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyDiLxDM7ottlE-59G5Gjtsyb_qYWNGF57g",
+      authDomain: "lagoinha-f73cc.firebaseapp.com",
+      projectId: "lagoinha-f73cc",
+      storageBucket: "lagoinha-f73cc.firebasestorage.app",
+      messagingSenderId: "657454722836",
+      appId: "1:657454722836:web:2ba3acd3c4712ccb609c01"
+    };
+
+    // Inicializa Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const loginBtn = document.getElementById('loginBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const resetLink = document.getElementById('resetLink');
+    const notif = document.getElementById('notif');
+
+    function showNotification(message, type = 'error') {
+      notif.textContent = message;
+      notif.className = `notification ${type}`;
+      notif.style.display = 'block';
+      setTimeout(() => { notif.style.display = 'none'; }, 5000);
+    }
+
+    // Login
+    loginBtn.addEventListener('click', async () => {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+
+      if (!email || !password) {
+        showNotification('Preencha email e senha.', 'error');
+        return;
+      }
+      
+      try {
+        await auth.signInWithEmailAndPassword(email, password);
+        showNotification('Login realizado com sucesso. Redirecionando...', 'success');
+        setTimeout(() => { window.location.href = 'dashboard.html'; }, 1500);
+      } catch (err) {
+        showNotification('Email ou senha incorretos. Tente novamente.', 'error');
+      }
+    });
+
+    // Criar conta
+    signupBtn.addEventListener('click', async () => {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      
+      if (!email || !password) {
+        showNotification('Preencha email e senha para criar conta.', 'error');
+        return;
+      }
+      
+      if (password.length < 6) {
+        showNotification('A senha deve ter pelo menos 6 caracteres.', 'error');
+        return;
+      }
+      
+      try {
+        const userCred = await auth.createUserWithEmailAndPassword(email, password);
+        // Cria documento em /users com role = member
+        await db.collection('users').doc(userCred.user.uid).set({
+          email: email,
+          role: 'member',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showNotification('Conta criada com sucesso. Redirecionando...', 'success');
+        setTimeout(() => { window.location.href = 'dashboard.html'; }, 1500);
+      } catch (err) {
+        showNotification('Erro ao criar conta: ' + err.message, 'error');
+      }
+    });
+
+    // Reset de senha
+    resetLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const email = emailInput.value.trim();
+      
+      if (!email) {
+        showNotification('Digite seu email para receber o link de recuperação.', 'error');
+        return;
+      }
+      
+      try {
+        await auth.sendPasswordResetEmail(email);
+        showNotification('Email de recuperação enviado. Verifique sua caixa de entrada.', 'success');
+      } catch (err) {
+        showNotification('Erro ao enviar email: ' + err.message, 'error');
+      }
+    });
+
+    // Se já está logado, redireciona automaticamente
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        window.location.href = 'dashboard.html';
+      }
+    });
+
+    // Permitir login ao pressionar Enter
+    passwordInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        loginBtn.click();
+      }
+    });
+  </script>
+</body>
+</html>

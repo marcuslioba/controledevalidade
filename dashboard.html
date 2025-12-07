@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Dashboard - Vencimentos e Chamados Separados</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined');
+  :root{--green:#27ae60;--red:#e74c3c;--blue:#2575fc;--muted:#f5f7fa;--card-bg:#fff}
+  body{font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif;background:#f0f2f5;margin:0;padding:0;color:#222;display:flex;flex-direction:column;min-height:100vh;}
+  .navbar {
+    background: var(--blue);
+    color: white;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+  }
+  .nav-container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .logo {
+    font-weight: 700;
+    font-size: 1.2rem;
+  }
+  .menu-toggle {
+    display: none;
+    font-size: 1.5rem;
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    margin-left: 10px;
+  }
+  .nav-links {
+    list-style: none;
+    display: flex;
+    gap: 20px;
+    margin-left: 20px;
+    flex-grow: 1;
+  }
+  .nav-links li a {
+    color: white;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .nav-links li a:hover {
+    text-decoration: underline;
+  }
+  .user-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .user-photo {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .logout-btn {
+    background: transparent;
+    border: 1px solid white;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .logout-btn:hover {
+    background: white;
+    color: var(--blue);
+  }
+  #admin-menu-item {
+    display: none;
+  }
+  @media (max-width: 760px) {
+    .menu-toggle {
+    display: block;
+    }
+    .nav-links {
+    position: fixed;
+    top: 50px;
+    left: 0;
+    right: 0;
+    background: var(--blue);
+    flex-direction: column;
+    gap: 0;
+    display: none;
+    z-index: 1001;
+    }
+    .nav-links.show {
+    display: flex;
+    }
+    .nav-links li {
+    border-bottom: 1px solid rgba(255,255,255,0.3);
+    }
+    .nav-links li a {
+    display: block;
+    padding: 12px 20px;
+    }
+  }
+  .container{
+    max-width:1100px;
+    margin: 70px auto 20px auto;
+    background:var(--card-bg);
+    padding:20px 26px;
+    border-radius:12px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.06);
+    flex-grow: 1;
+  }
+  h1{margin:0 0 18px;font-weight:700;color:#2c3e50}
+  .cards{display:flex;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+  .card{flex:1;min-width:180px;border-radius:10px;padding:16px 18px;color:#fff;display:flex;flex-direction:column;align-items:flex-start;gap:10px;box-shadow:0 6px 20px rgba(0,0,0,0.06);position:relative}
+  .card h2{margin:0;font-size:1rem;display:flex;align-items:center;gap:8px}
+  .card p{margin:0;font-size:1.6rem;font-weight:800}
+  .card.income{background:linear-gradient(135deg,#2ecc71,#27ae60)}
+  .card.expense{background:linear-gradient(135deg,#ff6b6b,#e74c3c)}
+  .card.balance-positive{background:linear-gradient(135deg,#2ecc71,#27ae60)}
+  .card.balance-negative{background:linear-gradient(135deg,#ff6b6b,#c0392b)}
+  .material-symbols-outlined{font-variation-settings:'FILL' 1,'wght' 600; font-size:20px}
+  .lists{display:flex;gap:20px;flex-wrap:wrap}
+  .list{flex:1 1 360px;background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 6px 18px rgba(0,0,0,0.04)}
+  .list h3{margin:0 0 12px;padding-bottom:6px;border-bottom:2px solid var(--blue);color:#34495e}
+  ul{list-style:none;padding:0;margin:0;max-height:420px;overflow:auto}
+  li.item{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:8px;background:#fbfcfd;margin-bottom:10px;transition:transform .12s ease,box-shadow .12s ease}
+  li.item:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(37,117,252,0.06)}
+  .item-info{display:flex;flex-direction:column}
+  .item-name{font-weight:700;color:#233044}
+  .item-sub{font-size:0.9rem;color:#7f8c8d}
+  .item-right{display:flex;align-items:center;gap:10px}
+  .item-value{font-weight:800;color:var(--blue)}
+  .status{padding:6px 10px;border-radius:999px;color:#fff;font-weight:700;font-size:0.85rem;cursor:pointer}
+  .status-pendente{background:#f39c12}
+  .status-aprovado{background:#2980b9}
+  .status-pago{background:#27ae60}
+  .status-negado{background:#c0392b}
+  .urgency-0{background:linear-gradient(90deg,#f9fbff 0%,#f9fbff 100%)}
+  .urgency-1{background:linear-gradient(90deg,#fff9ec 0%,#fff3d6 100%)}
+  .urgency-2{background:linear-gradient(90deg,#fff3e6 0%,#ffe6d3 100%)}
+  .urgency-3{background:linear-gradient(90deg,#ffe6d6 0%,#ffd1c2 100%)}
+  .urgency-due{background:linear-gradient(90deg,#ffe6e6 0%,#ffd1d1 100%)}
+  .filters{display:flex;gap:8px;margin-bottom:8px}
+  .filter-btn{padding:6px 10px;border-radius:8px;border:1px solid #e6eefc;background:#fff;cursor:pointer}
+  .filter-btn[aria-pressed="true"]{background:#2575fc;color:#fff;border-color:transparent}
+  .modal-backdrop{position:fixed;inset:0;display:none;justify-content:center;align-items:center;background:rgba(0,0,0,0.35);z-index:1200}
+  .modal-card{background:#fff;padding:16px;border-radius:10px;min-width:320px;box-shadow:0 10px 40px rgba(0,0,0,0.2)}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+  .btn{padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+  .btn.primary{background:#2575fc;color:#fff}
+  .btn.ghost{background:#f3f6fb;color:#233044;border:1px solid #e6eefc}
+  @media(max-width:760px){.cards{flex-direction:column}.lists{flex-direction:column}.list{flex-basis:100%}}
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <div class="nav-container">
+    <div class="logo">Financeiro Igreja</div>
+    <button class="menu-toggle">☰</button>
+    <ul class="nav-links">
+    <li><a href="dashboard.html" class="active">Dashboard</a></li>
+    <li><a href="categorias.html">Categorias</a></li>
+    <li><a href="chamados.html">Chamados</a></li>
+    <li><a href="financas.html">Financeiro</a></li>
+    <li id="admin-menu-item" style="display:none;"><a href="usuarios.html">Usuários</a></li>
+    </ul>
+    <div class="user-section">
+    <img src="https://placehold.co/100" alt="Foto do Usuário" class="user-photo" id="user-photo-img">
+    <button class="logout-btn" id="logout-btn">Sair</button>
+    </div>
+  </div>
+</nav>
+<div class="container">
+  <h1>Dashboard Financeiro</h1>
+  <div class="cards">
+    <div class="card income" id="card-income">
+    <h2><span class="material-symbols-outlined">arrow_upward</span> Entradas</h2>
+    <p id="total-income">R$ 0,00</p>
+    </div>
+    <div class="card expense" id="card-expense">
+    <h2><span class="material-symbols-outlined">arrow_downward</span> Despesas</h2>
+    <p id="total-expense">R$ 0,00</p>
+    </div>
+    <div class="card" id="card-balance">
+    <h2><span class="material-symbols-outlined">balance</span> Saldo</h2>
+    <p id="balance">R$ 0,00</p>
+    </div>
+  </div>
+
+  <div class="lists">
+    <div class="list" id="vencimentos-container">
+    <h3>Próximos Vencimentos (Interno)</h3>
+    <ul id="upcoming-due-list"></ul>
+    </div>
+
+    <div class="list">
+    <h3>Chamados</h3>
+    <div class="filters">
+    <button class="filter-btn" data-status="" aria-pressed="true">Todos</button>
+    <button class="filter-btn" data-status="pendente" aria-pressed="false">Pendente</button>
+    <button class="filter-btn" data-status="aprovado" aria-pressed="false">Aprovado</button>
+    <button class="filter-btn" data-status="pago" aria-pressed="false">Pago</button>
+    <button class="filter-btn" data-status="negado" aria-pressed="false">Negado</button>
+    </div>
+    <ul id="recent-calls-list"></ul>
+    </div>
+  </div>
+</div>
+
+<!-- Vencimento modal -->
+<div id="vencimento-modal" class="modal-backdrop">
+  <div class="modal-card">
+    <h3>Ação no Vencimento</h3>
+    <p id="vencimento-title">Escolha ação</p>
+    <div style="margin-top:8px">
+    <label for="vencimento-new-date">Nova data (Reagendar)</label>
+    <input id="vencimento-new-date" type="date" style="width:100%;padding:8px;margin-top:6px;border-radius:6px;border:1px solid #ddd" />
+    </div>
+    <div class="modal-actions">
+    <button class="btn ghost" id="venc-cancel">Cancelar</button>
+    <button class="btn" id="venc-reschedule">Reagendar</button>
+    <button class="btn primary" id="venc-mark-paid">Marcar como Pago</button>
+    </div>
+  </div>
+</div>
+
+<!-- Status modal for Chamados -->
+<div id="chamado-status-modal" class="modal-backdrop">
+  <div class="modal-card">
+    <h3>Alterar status do Chamado</h3>
+    <div>
+    <label for="chamado-status-select">Novo status</label>
+    <select id="chamado-status-select" style="width:100%;padding:8px;margin-top:8px;border-radius:6px;border:1px solid #ddd">
+    <option value="pendente">Pendente</option>
+    <option value="aprovado">Aprovado</option>
+    <option value="pago">Pago</option>
+    <option value="negado">Negado</option>
+    </select>
+    </div>
+    <div id="chamado-scheduled-container" style="margin-top:8px;display:none">
+    <label for="chamado-scheduled-date">Data prevista de pagamento (visível ao membro)</label>
+    <input id="chamado-scheduled-date" type="date" style="width:100%;padding:8px;margin-top:6px;border-radius:6px;border:1px solid #ddd" />
+    </div>
+    <div class="modal-actions">
+    <button class="btn ghost" id="chamado-cancel">Cancelar</button>
+    <button class="btn primary" id="chamado-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script>
+  // configure com sua conta
+  const firebaseConfig = {
+    apiKey: "AIzaSyDiLxDM7ottlE-59G5Gjtsyb_qYWNGF57g",
+    authDomain: "lagoinha-f73cc.firebaseapp.com",
+    projectId: "lagoinha-f73cc",
+    storageBucket: "lagoinha-f73cc.firebasestorage.app",
+    messagingSenderId: "657454722836",
+    appId: "1:657454722836:web:2ba3acd3c4712ccb609c01"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // elements
+  const totalIncomeEl = document.getElementById('total-income');
+  const totalExpenseEl = document.getElementById('total-expense');
+  const balanceEl = document.getElementById('balance');
+  const cardBalance = document.getElementById('card-balance');
+  const upcomingDueList = document.getElementById('upcoming-due-list');
+  const recentCallsList = document.getElementById('recent-calls-list');
+  const filterButtons = document.querySelectorAll('.filter-btn');
+  const vencimentosContainer = document.getElementById('vencimentos-container');
+
+  const vencModal = document.getElementById('vencimento-modal');
+  const vencNewDate = document.getElementById('vencimento-new-date');
+  const vencCancel = document.getElementById('venc-cancel');
+  const vencRescheduleBtn = document.getElementById('venc-reschedule');
+  const vencMarkPaidBtn = document.getElementById('venc-mark-paid');
+
+  const chamadoStatusModal = document.getElementById('chamado-status-modal');
+  const chamadoStatusSelect = document.getElementById('chamado-status-select');
+  const chamadoScheduledContainer = document.getElementById('chamado-scheduled-container');
+  const chamadoScheduledDate = document.getElementById('chamado-scheduled-date');
+  const chamadoCancelBtn = document.getElementById('chamado-cancel');
+  const chamadoSaveBtn = document.getElementById('chamado-save');
+
+  let currentUser = null; let currentUserRole = null;
+  let duesCache = []; // vencimentos
+  let callsCache = []; // chamados
+  let editingDueId = null; let editingCallId = null;
+  let currentStatusFilter = '';
+  const currencyFormatter = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+
+  function normalizeStatus(s){ if(!s) return 'pendente'; s=String(s).toLowerCase(); if(s==='pending') return 'pendente'; if(s==='approved') return 'aprovado'; if(s==='paid') return 'pago'; if(s==='denied') return 'negado'; const map={'pendente':'pendente','aprovado':'aprovado','pago':'pago','negado':'negado'}; return map[s]||s }
+  function statusLabel(s){ const map={'pendente':'Pendente','aprovado':'Aprovado','pago':'Pago','negado':'Negado'}; return map[normalizeStatus(s)]||s }
+  function statusTitle(s){ const map={'pendente':'Aguardando aprovação','aprovado':'Chamado aprovado','pago':'Despesa paga','negado':'Chamado negado'}; return map[s]||'' }
+
+  function showNotification(msg,type='success'){ const n=document.createElement('div'); n.textContent=msg; n.className=`notification ${type}`; n.style.display='block'; n.style.margin='10px 0'; document.querySelector('.container').prepend(n); setTimeout(()=>n.remove(),3500) }
+
+  function escapeHtml(text){ return String(text||'').replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>') }
+  function getDaysDiff(targetDate){ const today=new Date(); const t=new Date(targetDate.getFullYear(),targetDate.getMonth(),targetDate.getDate()); const a=new Date(today.getFullYear(),today.getMonth(),today.getDate()); const diff = Math.ceil((t-a)/(1000*60*60*24)); return diff }
+
+  // Render Vencimentos (admin-only)
+  function renderVencimentos(){
+    upcomingDueList.innerHTML='';
+    if(currentUserRole!=='admin'){
+    vencimentosContainer.style.display='none';
+    return;
+    }
+    vencimentosContainer.style.display='block';
+
+    const hoje = new Date();
+    const proximos30Dias = new Date();
+    proximos30Dias.setDate(hoje.getDate() + 30);
+
+    const items = duesCache.filter(d=>{
+    const status = d.status ? d.status.toLowerCase() : '';
+    if(status !== 'pendente') return false;
+
+    let dueDate = null;
+    if(d.vencimento){
+    if(d.vencimento.toDate) dueDate = d.vencimento.toDate();
+    else dueDate = new Date(d.vencimento);
+    }
+    if(!dueDate) return false;
+
+    return dueDate >= hoje && dueDate <= proximos30Dias;
+    }).sort((a,b)=>{
+    const da = a.vencimento.toDate ? a.vencimento.toDate() : new Date(a.vencimento);
+    const db = b.vencimento.toDate ? b.vencimento.toDate() : new Date(b.vencimento);
+    return da - db;
+    }).slice(0,8);
+
+    if(items.length === 0){
+    upcomingDueList.innerHTML = '<li class="item">Sem próximos vencimentos</li>';
+    return;
+    }
+
+    items.forEach(d=>{
+    const dueDate = d.vencimento.toDate ? d.vencimento.toDate() : new Date(d.vencimento);
+    const days = getDaysDiff(dueDate);
+    const li = document.createElement('li');
+    li.className = 'item';
+    if(days !== null){
+    if(days > 7) li.classList.add('urgency-0');
+    else if(days > 3) li.classList.add('urgency-1');
+    else if(days > 1) li.classList.add('urgency-2');
+    else if(days === 1) li.classList.add('urgency-3');
+    else li.classList.add('urgency-due');
+    }
+    li.innerHTML = `
+    <div class="item-info">
+    <span class="item-name">${escapeHtml(d.nome || 'Sem título')}</span>
+    <span class="item-sub">${escapeHtml(d.categoria || 'Sem categoria')} • ${dueDate.toLocaleDateString('pt-BR')}</span>
+    </div>
+    <div class="item-right">
+    <div class="item-value">${currencyFormatter.format(d.valor || 0)}</div>
+    <div class="status status-${normalizeStatus(d.status)}" title="${statusTitle(normalizeStatus(d.status))}">${statusLabel(d.status)}</div>
+    </div>
+    `;
+
+    li.addEventListener('click', (ev)=>{
+    if(ev.target.closest('.status')) return;
+    if(currentUserRole !== 'admin'){
+    showNotification('Apenas administradores.', 'error');
+    return;
+    }
+    editingDueId = d.id;
+    vencNewDate.value = dueDate.toISOString().slice(0,10);
+    vencModal.style.display = 'flex';
+    });
+
+    const statusEl = li.querySelector('.status');
+    statusEl.addEventListener('click', (ev)=>{
+    ev.stopPropagation();
+    if(currentUserRole !== 'admin'){
+    showNotification('Apenas administradores.', 'error');
+    return;
+    }
+    editingDueId = d.id;
+    vencNewDate.value = dueDate.toISOString().slice(0,10);
+    vencModal.style.display = 'flex';
+    });
+
+    upcomingDueList.appendChild(li);
+    });
+  }
+
+  // Render Chamados (members + admin)
+  function renderChamados(){
+    recentCallsList.innerHTML = '';
+    let items = callsCache.filter(c => normalizeStatus(c.status) !== 'pago');
+    if(currentStatusFilter) items = items.filter(c => normalizeStatus(c.status) === currentStatusFilter);
+    items = items.filter(c => c.createdAt && c.createdAt.toDate).sort((a,b) => b.createdAt.toDate() - a.createdAt.toDate()).slice(0,12);
+    if(items.length === 0){
+    recentCallsList.innerHTML = '<li class="item">Sem chamados recentes</li>';
+    return;
+    }
+    items.forEach(c => {
+    const due = (c.scheduledPaymentDate && c.scheduledPaymentDate.toDate) ? c.scheduledPaymentDate.toDate() : (c.createdAt && c.createdAt.toDate ? c.createdAt.toDate() : null);
+    const li = document.createElement('li');
+    li.className = 'item';
+    li.innerHTML = `
+    <div class="item-info">
+    <span class="item-name">${escapeHtml(c.name || 'Sem título')}</span>
+    <span class="item-sub">${escapeHtml(c.category || 'Sem categoria')} • ${due ? due.toLocaleDateString('pt-BR') : '—'}</span>
+    </div>
+    <div class="item-right">
+    <div class="item-value">${currencyFormatter.format(c.value || 0)}</div>
+    <div class="status status-${normalizeStatus(c.status)}" title="${statusTitle(normalizeStatus(c.status))}">${statusLabel(c.status)}</div>
+    </div>
+    `;
+
+    const statusEl = li.querySelector('.status');
+    statusEl.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    openChamadoStatusModal(c.id, normalizeStatus(c.status));
+    });
+
+    recentCallsList.appendChild(li);
+    });
+  }
+
+  // Vencimento modal actions
+  vencCancel.addEventListener('click', () => {
+    editingDueId = null;
+    vencModal.style.display = 'none';
+  });
+  vencRescheduleBtn.addEventListener('click', async () => {
+    if(!editingDueId) return;
+    const v = vencNewDate.value;
+    if(!v){
+    showNotification('Escolha nova data.', 'error');
+    return;
+    }
+    try {
+    const d = new Date(v + 'T00:00:00');
+    await db.collection('contas').doc(editingDueId).update({ vencimento: firebase.firestore.Timestamp.fromDate(d), status: 'Pendente' });
+    showNotification('Vencimento reagendado.');
+    vencModal.style.display = 'none';
+    editingDueId = null;
+    await reloadAll();
+    } catch(err) {
+    showNotification('Erro: ' + err.message, 'error');
+    }
+  });
+  vencMarkPaidBtn.addEventListener('click', async () => {
+    if(!editingDueId) return;
+    try {
+    await db.collection('contas').doc(editingDueId).update({ status: 'Pago', paidAt: firebase.firestore.FieldValue.serverTimestamp() });
+    showNotification('Vencimento marcado como pago.');
+    vencModal.style.display = 'none';
+    editingDueId = null;
+    await reloadAll();
+    } catch(err) {
+    showNotification('Erro: ' + err.message, 'error');
+    }
+  });
+  vencModal.addEventListener('click', (e) => {
+    if(e.target === vencModal){
+    editingDueId = null;
+    vencModal.style.display = 'none';
+    }
+  });
+
+  // Chamado status modal
+  function openChamadoStatusModal(callId, currentStatus){
+    if(currentUserRole !== 'admin'){
+    showNotification('Apenas administradores.', 'error');
+    return;
+    }
+    editingCallId = callId;
+    chamadoStatusSelect.value = currentStatus || 'pendente';
+    chamadoScheduledDate.value = '';
+    chamadoScheduledContainer.style.display = (chamadoStatusSelect.value === 'aprovado') ? 'block' : 'none';
+    chamadoStatusModal.style.display = 'flex';
+  }
+  chamadoStatusSelect.addEventListener('change', () => {
+    chamadoScheduledContainer.style.display = (chamadoStatusSelect.value === 'aprovado') ? 'block' : 'none';
+  });
+  chamadoCancelBtn.addEventListener('click', () => {
+    editingCallId = null;
+    chamadoStatusModal.style.display = 'none';
+  });
+  chamadoStatusModal.addEventListener('click', (e) => {
+    if(e.target === chamadoStatusModal){
+    editingCallId = null;
+    chamadoStatusModal.style.display = 'none';
+    }
+  });
+  chamadoSaveBtn.addEventListener('click', async () => {
+    if(!editingCallId) return;
+    const newStatus = chamadoStatusSelect.value;
+    const sched = chamadoScheduledDate.value;
+    try {
+    const updateObj = { status: newStatus };
+    if(newStatus === 'aprovado' && sched){
+    const d = new Date(sched + 'T00:00:00');
+    updateObj.scheduledPaymentDate = firebase.firestore.Timestamp.fromDate(d);
+    }
+    if(newStatus === 'pago'){
+    updateObj.paidAt = firebase.firestore.FieldValue.serverTimestamp();
+    }
+    await db.collection('calls').doc(editingCallId).update(updateObj);
+    showNotification('Status do chamado atualizado.');
+    editingCallId = null;
+    chamadoStatusModal.style.display = 'none';
+    await reloadAll();
+    } catch(err) {
+    showNotification('Erro: ' + err.message, 'error');
+    }
+  });
+
+  // Load data
+  async function reloadAll(){
+    try {
+    // load contas (admin only)
+    if(currentUserRole === 'admin'){
+    const snapV = await db.collection('contas').get();
+    duesCache = snapV.docs.map(d => ({ id: d.id, ...d.data() }));
+    } else {
+    duesCache = [];
+    }
+    // load calls (admins see all, members only their own)
+    let q = db.collection('calls');
+    if(currentUserRole !== 'admin') q = q.where('userId', '==', currentUser.uid);
+    const snapC = await q.get();
+    callsCache = snapC.docs.map(d => ({ id: d.id, ...d.data() }));
+    recalcAndRender();
+    } catch(err) {
+    showNotification('Erro ao carregar dados: ' + err.message, 'error');
+    }
+  }
+
+  function recalcAndRender(){
+    let totalIncome = 0;
+    let totalExpense = 0;
+    // count paid items from both collections
+    duesCache.forEach(d => {
+    if(normalizeStatus(d.status) === 'pago') totalExpense += Number(d.valor || 0);
+    });
+    callsCache.forEach(c => {
+    if(normalizeStatus(c.status) === 'pago') totalExpense += Number(c.value || 0);
+    });
+    const balance = totalIncome - totalExpense;
+    totalIncomeEl.textContent = currencyFormatter.format(totalIncome);
+    totalExpenseEl.textContent = currencyFormatter.format(totalExpense);
+    balanceEl.textContent = currencyFormatter.format(balance);
+    if(balance >= 0){
+    cardBalance.classList.add('balance-positive');
+    cardBalance.classList.remove('balance-negative');
+    } else {
+    cardBalance.classList.add('balance-negative');
+    cardBalance.classList.remove('balance-positive');
+    }
+    renderVencimentos();
+    renderChamados();
+  }
+
+  // filters
+  filterButtons.forEach(btn => btn.addEventListener('click', () => {
+    filterButtons.forEach(b => b.setAttribute('aria-pressed', 'false'));
+    btn.setAttribute('aria-pressed', 'true');
+    currentStatusFilter = btn.getAttribute('data-status') || '';
+    reloadAll();
+  }));
+
+  // auth
+  auth.onAuthStateChanged(user => {
+    if(!user){
+    window.location.href = 'index.html';
+    return;
+    }
+    currentUser = user;
+    db.collection('users').doc(user.uid).get().then(d => {
+    currentUserRole = (d.exists && d.data().role) ? d.data().role : 'member';
+    reloadAll();
+    attachRealtime();
+
+    // Show admin menu item if user is admin
+    const adminMenuItem = document.getElementById('admin-menu-item');
+    const userPhotoImg = document.getElementById('user-photo-img');
+    if(currentUserRole === 'admin') {
+    adminMenuItem.style.display = 'block';
+    } else {
+    adminMenuItem.style.display = 'none';
+    }
+
+    // Set user photo if available
+    if(user.photoURL) {
+    userPhotoImg.src = user.photoURL;
+    } else {
+    userPhotoImg.src = 'https://placehold.co/100';
+    }
+    }).catch(err => {
+    showNotification('Erro ao buscar usuário: ' + err.message, 'error');
+    });
+  });
+
+  function attachRealtime(){
+    if(currentUserRole === 'admin'){
+    db.collection('contas').onSnapshot(() => { reloadAll(); }, err => console.error(err));
+    db.collection('calls').onSnapshot(() => { reloadAll(); }, err => console.error(err));
+    } else {
+    db.collection('calls').where('userId', '==', currentUser.uid).onSnapshot(() => { reloadAll(); }, err => console.error(err));
+    }
+  }
+
+  // Menu toggle for mobile
+  document.addEventListener('DOMContentLoaded', () => {
+    const menuToggle = document.querySelector('.menu-toggle');
+    const navLinks = document.querySelector('.nav-links');
+    menuToggle.addEventListener('click', () => {
+    navLinks.classList.toggle('show');
+    });
+
+    const logoutBtn = document.getElementById('logout-btn');
+    logoutBtn.addEventListener('click', () => {
+    auth.signOut().then(() => {
+    window.location.href = 'index.html';
+    });
+    });
+  });
+</script>
+</body>
+</html>

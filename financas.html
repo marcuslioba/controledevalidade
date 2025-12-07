@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Finanças - Cadastro de Contas a Pagar</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined');
+  :root{--green:#27ae60;--red:#e74c3c;--blue:#2575fc;--muted:#f5f7fa;--card-bg:#fff}
+  body{font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif;background:#f0f2f5;margin:0;padding:0;color:#222;display:flex;flex-direction:column;min-height:100vh;}
+  .navbar {
+    background: var(--blue);
+    color: white;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+  }
+  .nav-container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .logo {
+    font-weight: 700;
+    font-size: 1.2rem;
+  }
+  .menu-toggle {
+    display: none;
+    font-size: 1.5rem;
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    margin-left: 10px;
+  }
+  .nav-links {
+    list-style: none;
+    display: flex;
+    gap: 20px;
+    margin-left: 20px;
+    flex-grow: 1;
+  }
+  .nav-links li a {
+    color: white;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .nav-links li a:hover {
+    text-decoration: underline;
+  }
+  .nav-links li a.active {
+    color: #f1c40f;
+    text-decoration: underline;
+  }
+  .user-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .user-photo {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .logout-btn {
+    background: transparent;
+    border: 1px solid white;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .logout-btn:hover {
+    background: white;
+    color: var(--blue);
+  }
+  @media (max-width: 760px) {
+    .menu-toggle {
+    display: block;
+    }
+    .nav-links {
+    position: fixed;
+    top: 50px;
+    left: 0;
+    right: 0;
+    background: var(--blue);
+    flex-direction: column;
+    gap: 0;
+    display: none;
+    z-index: 1001;
+    }
+    .nav-links.show {
+    display: flex;
+    }
+    .nav-links li {
+    border-bottom: 1px solid rgba(255,255,255,0.3);
+    }
+    .nav-links li a {
+    display: block;
+    padding: 12px 20px;
+    }
+  }
+  .container{
+    max-width:1100px;
+    margin: 70px auto 20px auto;
+    background:var(--card-bg);
+    padding:20px 26px;
+    border-radius:12px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.06);
+    flex-grow: 1;
+  }
+  h1 {
+    margin-bottom: 20px;
+  }
+  form {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    max-width: 600px;
+    margin-bottom: 40px;
+  }
+  label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: bold;
+  }
+  input, select, textarea {
+    width: 100%;
+    padding: 8px 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+  }
+  button {
+    background-color: var(--blue);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  button:hover {
+    background-color: #1a5bb8;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+  th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+  th {
+    background-color: var(--blue);
+    color: white;
+  }
+  tr:hover {
+    background-color: #f1f1f1;
+  }
+  .status-pendente {
+    color: #e67e22;
+    font-weight: bold;
+  }
+  .status-pago {
+    color: #27ae60;
+    font-weight: bold;
+  }
+  .btn-small {
+    padding: 6px 10px;
+    font-size: 0.9rem;
+    margin-right: 5px;
+    border-radius: 4px;
+  }
+  .btn-edit {
+    background-color: #2980b9;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-delete {
+    background-color: #c0392b;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-pagar {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  .money-input {
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-container">
+    <div class="logo">Financeiro Igreja</div>
+    <button class="menu-toggle">☰</button>
+    <ul class="nav-links">
+    <li><a href="dashboard.html">Dashboard</a></li>
+    <li><a href="categorias.html">Categorias</a></li>
+    <li><a href="chamados.html">Chamados</a></li>
+    <li><a href="financas.html" class="active">Financeiro</a></li>
+    <li id="admin-menu-item" style="display:none;"><a href="usuarios.html">Usuários</a></li>
+    </ul>
+    <div class="user-section">
+    <img src="https://placehold.co/100" alt="Foto do Usuário" class="user-photo" id="user-photo-img">
+    <button class="logout-btn" id="logout-btn">Sair</button>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+  <h1>Cadastro de Contas a Pagar</h1>
+
+  <form id="contaForm">
+    <label for="nome">Nome da Conta</label>
+    <input type="text" id="nome" name="nome" required />
+
+    <label for="categoria">Categoria</label>
+    <select id="categoria" name="categoria" required>
+    <option value="">Selecione uma categoria</option>
+    <option value="Aluguel">Aluguel</option>
+    <option value="Energia">Energia</option>
+    <option value="Água">Água</option>
+    <option value="Internet">Internet</option>
+    <option value="Outros">Outros</option>
+    </select>
+
+    <label for="valor">Valor (R$)</label>
+    <input type="text" id="valor" name="valor" class="money-input" required />
+
+    <label for="vencimento">Data de Vencimento</label>
+    <input type="date" id="vencimento" name="vencimento" required />
+
+    <label for="observacoes">Observações</label>
+    <textarea id="observacoes" name="observacoes" rows="3"></textarea>
+
+    <label for="status">Status</label>
+    <select id="status" name="status" required>
+    <option value="Pendente">Pendente</option>
+    <option value="Pago">Pago</option>
+    </select>
+
+    <button type="submit">Cadastrar Conta</button>
+  </form>
+
+  <h2>Contas Cadastradas</h2>
+  <table id="contasTable">
+    <thead>
+    <tr>
+    <th>Nome</th>
+    <th>Categoria</th>
+    <th>Valor (R$)</th>
+    <th>Vencimento</th>
+    <th>Status</th>
+    <th>Ações</th>
+    </tr>
+    </thead>
+    <tbody>
+    <!-- Linhas serão inseridas aqui dinamicamente -->
+    </tbody>
+  </table>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script>
+  // Configuração Firebase - substitua pelos seus dados
+const firebaseConfig = {
+  apiKey: "AIzaSyDiLxDM7ottlE-59G5Gjtsyb_qYWNGF57g",
+  authDomain: "lagoinha-f73cc.firebaseapp.com",
+  projectId: "lagoinha-f73cc",
+  storageBucket: "lagoinha-f73cc.firebasestorage.app",
+  messagingSenderId: "657454722836",
+  appId: "1:657454722836:web:2ba3acd3c4712ccb609c01"
+};
+
+  // Inicializa Firebase
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const auth = firebase.auth();
+
+  // Referência para a coleção de contas
+  const contasRef = db.collection('contas');
+
+  const contaForm = document.getElementById('contaForm');
+  const contasTableBody = document.querySelector('#contasTable tbody');
+  const valorInput = document.getElementById('valor');
+
+  // Função para formatar valor como moeda
+  function formatarMoeda(valor) {
+    const numero = parseFloat(valor.replace(/\D/g, '')) / 100;
+    return numero.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    });
+  }
+
+  // Função para formatar campo de valor em tempo real
+  valorInput.addEventListener('input', function(e) {
+    let valor = e.target.value;
+    
+    // Remove tudo que não é número
+    valor = valor.replace(/\D/g, '');
+    
+    // Adiciona vírgula para centavos
+    valor = valor.replace(/(\d)(\d{2})$/, '$1,$2');
+    
+    // Adiciona ponto para milhares
+    valor = valor.replace(/(?=(\d{3})+(\D))\B/g, '.');
+    
+    // Adiciona prefixo R$
+    e.target.value = valor ? 'R$ ' + valor : '';
+  });
+
+  // Função para limpar o formulário
+  function limparFormulario() {
+    contaForm.reset();
+  }
+
+  // Função para renderizar as contas na tabela
+  function renderizarContas(snapshot) {
+    contasTableBody.innerHTML = '';
+    snapshot.forEach(doc => {
+    const conta = doc.data();
+    const tr = document.createElement('tr');
+
+    tr.innerHTML = `
+    <td>${conta.nome}</td>
+    <td>${conta.categoria}</td>
+    <td>R$ ${parseFloat(conta.valor).toFixed(2).replace('.', ',')}</td>
+    <td>${conta.vencimento}</td>
+    <td class="status-${conta.status.toLowerCase()}">${conta.status}</td>
+    <td>
+    <button class="btn-small btn-edit" data-id="${doc.id}">Editar</button>
+    <button class="btn-small btn-delete" data-id="${doc.id}">Excluir</button>
+    ${conta.status === 'Pendente' ? `<button class="btn-small btn-pagar" data-id="${doc.id}">Marcar como Pago</button>` : ''}
+    </td>
+    `;
+
+    contasTableBody.appendChild(tr);
+    });
+
+    // Adiciona eventos aos botões
+    document.querySelectorAll('.btn-delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+    const id = e.target.getAttribute('data-id');
+    if(confirm('Tem certeza que deseja excluir esta conta?')) {
+    await contasRef.doc(id).delete();
+    }
+    });
+    });
+
+    document.querySelectorAll('.btn-pagar').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+    const id = e.target.getAttribute('data-id');
+    await contasRef.doc(id).update({ status: 'Pago' });
+    });
+    });
+
+    document.querySelectorAll('.btn-edit').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+    const id = e.target.getAttribute('data-id');
+    const doc = await contasRef.doc(id).get();
+    const conta = doc.data();
+
+    // Preenche o formulário para edição
+    contaForm.nome.value = conta.nome;
+    contaForm.categoria.value = conta.categoria;
+    
+    // Formata o valor para exibição
+    const valorFormatado = parseFloat(conta.valor).toFixed(2).replace('.', '');
+    valorInput.value = `R$ ${valorFormatado}`;
+
+    contaForm.vencimento.value = conta.vencimento;
+    contaForm.observacoes.value = conta.observacoes;
+    contaForm.status.value = conta.status;
+
+    // Salva o id no formulário para atualizar
+    contaForm.setAttribute('data-edit-id', id);
+    });
+    });
+  }
+
+  // Escuta alterações em tempo real
+  contasRef.orderBy('vencimento').onSnapshot(renderizarContas);
+
+  // Envio do formulário
+  contaForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // Extrai o valor numérico do campo formatado
+    let valorNumerico = valorInput.value;
+    valorNumerico = valorNumerico.replace('R$', '').replace(/\./g, '').replace(',', '.');
+
+    const contaData = {
+    nome: contaForm.nome.value.trim(),
+    categoria: contaForm.categoria.value,
+    valor: parseFloat(valorNumerico),
+    vencimento: contaForm.vencimento.value,
+    observacoes: contaForm.observacoes.value.trim(),
+    status: contaForm.status.value
+    };
+
+    const editId = contaForm.getAttribute('data-edit-id');
+
+    if(editId) {
+    // Atualiza conta existente
+    await contasRef.doc(editId).update(contaData);
+    contaForm.removeAttribute('data-edit-id');
+    } else {
+    // Cria nova conta
+    await contasRef.add(contaData);
+    }
+
+    limparFormulario();
+  });
+
+  // Menu toggle para mobile e fechar ao clicar em link
+  document.addEventListener('DOMContentLoaded', () => {
+    const menuToggle = document.querySelector('.menu-toggle');
+    const navLinks = document.querySelector('.nav-links');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    menuToggle.addEventListener('click', () => {
+    navLinks.classList.toggle('show');
+    });
+
+    document.querySelectorAll('.nav-links a').forEach(link => {
+    link.addEventListener('click', () => {
+    if(navLinks.classList.contains('show')) {
+    navLinks.classList.remove('show');
+    }
+    });
+    });
+
+    logoutBtn.addEventListener('click', () => {
+    auth.signOut().then(() => {
+    window.location.href = 'index.html';
+    });
+    });
+  });
+
+  // Verifica permissões do usuário
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      const adminMenuItem = document.getElementById('admin-menu-item');
+      const userPhotoImg = document.getElementById('user-photo-img');
+      
+      db.collection('users').doc(user.uid).get().then(doc => {
+        if (doc.exists) {
+          const userData = doc.data();
+          const role = userData.role || 'member';
+          
+          // Mostra menu de usuários apenas para administradores
+          if(role === 'admin') {
+            adminMenuItem.style.display = 'block';
+          }
+          
+          // Carrega foto do usuário
+          if(userData.photoURL) {
+            userPhotoImg.src = userData.photoURL;
+          } else {
+            userPhotoImg.src = 'https://placehold.co/100';
+          }
+        }
+      }).catch(error => {
+        console.error("Erro ao obter dados do usuário:", error);
+      });
+    } else {
+      // Usuário não autenticado
+      window.location.href = 'index.html';
+    }
+  });
+</script>
+
+</body>
+</html>
