@@ -550,7 +550,13 @@
     let totalExpense = 0;
     // count paid items from both collections
     duesCache.forEach(d => {
-    if(normalizeStatus(d.status) === 'pago') totalExpense += Number(d.valor || 0);
+    if(normalizeStatus(d.status) === 'pago') {
+    if(d.tipo === 'Entrada') {
+    totalIncome += Number(d.valor || 0);
+    } else {
+    totalExpense += Number(d.valor || 0);
+    }
+    }
     });
     callsCache.forEach(c => {
     if(normalizeStatus(c.status) === 'pago') totalExpense += Number(c.value || 0);
